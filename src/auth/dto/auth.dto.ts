@@ -139,3 +139,32 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken!: string;
 }
+
+export class PhoneLoginDto {
+  @ApiProperty({ example: '9555555555', description: 'Customer mobile number' })
+  @IsString()
+  @IsNotEmpty()
+  mobileNumber!: string;
+}
+
+export class TruecallerLoginDto {
+  @ApiProperty({ example: '9555555555', description: 'Customer mobile number' })
+  @IsString()
+  @IsNotEmpty()
+  mobileNumber!: string;
+
+  @ApiProperty({ example: 'John', required: false })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiProperty({ example: 'Doe', required: false })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
+  @ApiProperty({ example: 'john.doe@email.com', required: false })
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+}

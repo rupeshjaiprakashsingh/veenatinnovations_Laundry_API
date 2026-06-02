@@ -13,6 +13,8 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  PhoneLoginDto,
+  TruecallerLoginDto,
 } from './dto/auth.dto';
 
 @ApiTags('Authentication')
@@ -28,6 +30,24 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Public()
+  @Post('phone-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login customer using verified mobile number' })
+  @ApiResponse({ status: 200, description: 'Phone login checked' })
+  phoneLogin(@Body() phoneLoginDto: PhoneLoginDto) {
+    return this.authService.phoneLogin(phoneLoginDto);
+  }
+
+  @Public()
+  @Post('truecaller-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify/register customer using Truecaller verified details' })
+  @ApiResponse({ status: 200, description: 'Truecaller login successful' })
+  truecallerLogin(@Body() truecallerLoginDto: TruecallerLoginDto) {
+    return this.authService.truecallerLogin(truecallerLoginDto);
   }
 
   @Public()

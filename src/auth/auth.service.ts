@@ -11,6 +11,8 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  PhoneLoginDto,
+  TruecallerLoginDto,
 } from './dto/auth.dto';
 
 @Injectable()
@@ -340,6 +342,101 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+    };
+  }
+
+  async phoneLogin(dto: PhoneLoginDto) {
+    const { mobileNumber } = dto;
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { mobileNumber },
+    });
+
+    if (!customer) {
+      return {
+        exists: false,
+        message: 'User not registered',
+      };
+    }
+
+    if (!customer.isActive) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
+    const tokens = await this.generateTokens(customer.id, customer.email, 'Customer', customer.customerCode);
+
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { refreshToken: tokens.refreshToken },
+    });
+
+    return {
+      exists: true,
+      user: {
+        id: customer.id,
+        email: customer.email,
+        name: `${customer.firstName} ${customer.lastName}`,
+        role: 'Customer',
+        code: customer.customerCode,
+      },
+      ...tokens,
+    };
+  }
+
+  async truecallerLogin(dto: TruecallerLoginDto) {
+    const { mobileNumber, firstName, lastName, email } = dto;
+
+    let customer = await this.prisma.customer.findUnique({
+      where: { mobileNumber },
+    });
+
+    if (!customer) {
+      const fName = firstName || 'Truecaller';
+      const lName = lastName || 'User';
+      const customerEmail = email || `tc_${mobileNumber}@laundry.com`;
+      
+      const existingEmail = await this.prisma.customer.findUnique({ where: { email: customerEmail } });
+      const finalEmail = existingEmail ? `tc_${mobileNumber}_${Date.now()}@laundry.com` : customerEmail;
+
+      const count = await this.prisma.customer.count();
+      const customerCode = `CUST-${String(count + 1).padStart(4, '0')}`;
+
+      const rawPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+      customer = await this.prisma.customer.create({
+        data: {
+          customerCode,
+          firstName: fName,
+          lastName: lName,
+          email: finalEmail,
+          mobileNumber,
+          password: hashedPassword,
+          isActive: true,
+        },
+      });
+    }
+
+    if (!customer.isActive) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
+    const tokens = await this.generateTokens(customer.id, customer.email, 'Customer', customer.customerCode);
+
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { refreshToken: tokens.refreshToken },
+    });
+
+    return {
+      user: {
+        id: customer.id,
+        email: customer.email,
+        name: `${customer.firstName} ${customer.lastName}`,
+        role: 'Customer',
+        code: customer.customerCode,
+      },
+      ...tokens,
     };
   }
 }

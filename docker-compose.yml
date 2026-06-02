@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: laundry-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: laundry_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laundry-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/laundry_db?schema=public
+      - PORT=3000
+      - JWT_SECRET=laundry_jwt_secret_key_123!
+      - JWT_EXPIRATION=1h
+      - JWT_REFRESH_EXPIRATION=7d
+      - CORS_ORIGIN=*
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

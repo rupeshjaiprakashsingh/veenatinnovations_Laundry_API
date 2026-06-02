@@ -1,0 +1,173 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Customer {
+  id                 Int             @id @default(autoincrement())
+  customerCode       String          @unique
+  firstName          String
+  lastName           String
+  mobileNumber       String          @unique
+  email              String          @unique
+  address            String?
+  city               String?
+  state              String?
+  pincode            String?
+  isActive           Boolean         @default(true)
+  createdDate        DateTime        @default(now())
+  updatedDate        DateTime        @updatedAt
+  password           String
+  refreshToken       String?
+  resetToken         String?
+  resetTokenExpires  DateTime?
+  orders             Order[]
+  pickupRequests     PickupRequest[]
+  notifications      Notification[]
+
+  @@map("customers")
+}
+
+model Branch {
+  id            Int        @id @default(autoincrement())
+  branchName    String
+  branchCode    String     @unique
+  address       String?
+  contactNumber String?
+  email         String?
+  isActive      Boolean    @default(true)
+  createdDate   DateTime   @default(now())
+  updatedDate   DateTime   @updatedAt
+  employees     Employee[]
+  orders        Order[]
+
+  @@map("branches")
+}
+
+model Employee {
+  id                 Int             @id @default(autoincrement())
+  employeeCode       String          @unique
+  fullName           String
+  mobileNumber       String          @unique
+  email              String          @unique
+  role               String          // SuperAdmin, BranchManager, Employee, DeliveryBoy
+  branchId           Int?
+  branch             Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  isActive           Boolean         @default(true)
+  createdDate        DateTime        @default(now())
+  password           String
+  refreshToken       String?
+  resetToken         String?
+  resetTokenExpires  DateTime?
+  pickupRequests     PickupRequest[]
+  deliveries         Delivery[]
+
+  @@map("employees")
+}
+
+model Service {
+  id             Int         @id @default(autoincrement())
+  serviceName    String
+  serviceType    String      // Washing, Dry Cleaning, Ironing, etc.
+  price          Float
+  description    String?
+  estimatedHours Int?
+  isActive       Boolean     @default(true)
+  orderItems     OrderItem[]
+
+  @@map("services")
+}
+
+model Order {
+  id             Int          @id @default(autoincrement())
+  orderNumber    String       @unique
+  customerId     Int
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branchId       Int
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  pickupDate     DateTime?
+  deliveryDate   DateTime?
+  orderStatus    String       // New Order, Pickup Scheduled, Picked Up, Processing, Washing, Dry Cleaning, Ironing, Ready For Delivery, Out For Delivery, Delivered, Cancelled
+  paymentStatus  String       // Pending, Paid, Partially Paid
+  totalAmount    Float
+  discountAmount Float        @default(0)
+  taxAmount      Float        @default(0)
+  netAmount      Float
+  notes          String?
+  createdDate    DateTime     @default(now())
+  orderItems     OrderItem[]
+  payments       Payment[]
+  deliveries     Delivery[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  orderId    Int
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId  Int
+  service    Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  clothType  String
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                   Int      @id @default(autoincrement())
+  orderId              Int
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMode          String   // Cash, Card, Online, etc.
+  amount               Float
+  transactionReference String?
+  paymentStatus        String   // Pending, Completed, Failed
+  paidDate             DateTime @default(now())
+
+  @@map("payments")
+}
+
+model PickupRequest {
+  id                 Int       @id @default(autoincrement())
+  customerId         Int
+  customer           Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pickupAddress      String
+  pickupDate         DateTime
+  pickupTime         String
+  status             String    // Pending, Assigned, Completed, Cancelled
+  assignedEmployeeId Int?
+  assignedEmployee   Employee? @relation(fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+
+  @@map("pickup_requests")
+}
+
+model Delivery {
+  id                 Int       @id @default(autoincrement())
+  orderId            Int
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deliveryEmployeeId Int?
+  deliveryEmployee   Employee? @relation(fields: [deliveryEmployeeId], references: [id], onDelete: SetNull)
+  deliveryDate       DateTime?
+  deliveryStatus     String    // Pending, OutForDelivery, Delivered, Failed
+  deliveryRemarks    String?
+
+  @@map("deliveries")
+}
+
+model Notification {
+  id               Int       @id @default(autoincrement())
+  customerId       Int
+  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  message          String
+  notificationType String    // Email, SMS, Push
+  isSent           Boolean   @default(false)
+  sentDate         DateTime?
+
+  @@map("notifications")
+}

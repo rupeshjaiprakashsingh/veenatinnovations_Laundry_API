@@ -40,6 +40,21 @@ export class CustomerRepository extends BasePrismaRepository<Customer> {
     super(prisma, prisma.customer);
   }
 
+  override async findById(id: number): Promise<any | null> {
+    return this.prisma.customer.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          orderBy: { createdDate: 'desc' },
+          include: {
+            orderItems: { include: { service: true } },
+            payments: true,
+          }
+        }
+      }
+    });
+  }
+
   async findByEmail(email: string): Promise<Customer | null> {
     return this.prisma.customer.findUnique({
       where: { email },

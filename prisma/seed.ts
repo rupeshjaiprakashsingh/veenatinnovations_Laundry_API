@@ -118,6 +118,13 @@ async function main() {
       description: 'Professional steam press for crisp shirts and trousers',
       estimatedHours: 12,
     },
+    {
+      serviceName: 'Bedsheet Wash',
+      serviceType: 'Washing',
+      price: 80.0,
+      description: 'Premium washing and sanitizing for double bedsheets',
+      estimatedHours: 24,
+    },
   ];
 
   for (const s of servicesData) {

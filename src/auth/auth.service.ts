@@ -88,7 +88,14 @@ export class AuthService {
     const emailExists = await this.prisma.customer.findUnique({ where: { email: dto.email } });
     if (emailExists) throw new BadRequestException('Email already registered');
 
-    const mobileExists = await this.prisma.customer.findUnique({ where: { mobileNumber: dto.mobileNumber } });
+    const mobileExists = await this.prisma.customer.findFirst({
+      where: {
+        OR: [
+          { mobileNumber: dto.mobileNumber },
+          { mobileNumber: dto.mobileNumber.startsWith('+91') ? dto.mobileNumber.slice(3) : `+91${dto.mobileNumber}` }
+        ]
+      }
+    });
     if (mobileExists) throw new BadRequestException('Mobile number already registered');
 
     // Auto-generate CustomerCode (e.g. CUST-xxxx)
@@ -109,6 +116,9 @@ export class AuthService {
         city: dto.city,
         state: dto.state,
         pincode: dto.pincode,
+        gender: dto.gender,
+        dob: dto.dob,
+        referralCode: dto.referralCode,
         isActive: true,
       },
     });
@@ -127,6 +137,13 @@ export class AuthService {
         name: `${customer.firstName} ${customer.lastName}`,
         role: 'Customer',
         code: customer.customerCode,
+        address: customer.address,
+        city: customer.city,
+        state: customer.state,
+        pincode: customer.pincode,
+        gender: customer.gender,
+        dob: customer.dob,
+        referralCode: customer.referralCode,
       },
       ...tokens,
     };
@@ -347,8 +364,13 @@ export class AuthService {
   async phoneLogin(dto: PhoneLoginDto) {
     const { mobileNumber } = dto;
 
-    const customer = await this.prisma.customer.findUnique({
-      where: { mobileNumber },
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        OR: [
+          { mobileNumber },
+          { mobileNumber: mobileNumber.startsWith('+91') ? mobileNumber.slice(3) : `+91${mobileNumber}` }
+        ]
+      },
     });
 
     if (!customer) {
@@ -377,6 +399,13 @@ export class AuthService {
         name: `${customer.firstName} ${customer.lastName}`,
         role: 'Customer',
         code: customer.customerCode,
+        address: customer.address,
+        city: customer.city,
+        state: customer.state,
+        pincode: customer.pincode,
+        gender: customer.gender,
+        dob: customer.dob,
+        referralCode: customer.referralCode,
       },
       ...tokens,
     };

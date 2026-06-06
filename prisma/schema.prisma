@@ -19,6 +19,9 @@ model Customer {
   state              String?
   pincode            String?
   isActive           Boolean         @default(true)
+  gender             String?
+  dob                String?
+  referralCode       String?
   createdDate        DateTime        @default(now())
   updatedDate        DateTime        @updatedAt
   password           String

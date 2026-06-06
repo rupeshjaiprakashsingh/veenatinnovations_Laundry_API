@@ -46,4 +46,19 @@ export class UpdateCustomerDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ example: 'Male', required: false })
+  @IsString()
+  @IsOptional()
+  gender?: string;
+
+  @ApiProperty({ example: '15/08/1995', required: false })
+  @IsString()
+  @IsOptional()
+  dob?: string;
+
+  @ApiProperty({ example: 'REF123', required: false })
+  @IsString()
+  @IsOptional()
+  referralCode?: string;
 }

@@ -15,7 +15,7 @@ import { JwtStrategy } from './jwt.strategy';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET') || 'laundry_jwt_secret_key_123!',
         signOptions: {
-          expiresIn: (configService.get<string>('JWT_EXPIRATION') || '1h') as any,
+          expiresIn: (configService.get<string>('JWT_EXPIRATION') || '365d') as any,
         },
       }),
     }),

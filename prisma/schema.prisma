@@ -28,6 +28,7 @@ model Customer {
   refreshToken       String?
   resetToken         String?
   resetTokenExpires  DateTime?
+  insuranceExpiry    DateTime?
   orders             Order[]
   pickupRequests     PickupRequest[]
   notifications      Notification[]

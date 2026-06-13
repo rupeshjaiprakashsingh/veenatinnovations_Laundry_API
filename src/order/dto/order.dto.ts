@@ -55,6 +55,10 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ example: true, required: false })
+  @IsOptional()
+  insuranceOpted?: boolean;
 }
 
 export class UpdateOrderStatusDto {

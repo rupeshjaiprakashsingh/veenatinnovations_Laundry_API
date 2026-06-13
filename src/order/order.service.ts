@@ -51,7 +51,16 @@ export class OrderService {
 
     // 2. Tax details (e.g. 5% GST/tax)
     const taxAmount = parseFloat((totalAmount * 0.05).toFixed(2));
-    const netAmount = parseFloat((totalAmount + taxAmount - discountAmount).toFixed(2));
+
+    // Check if customer already has active insurance (valid for 1 year)
+    const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
+    let insuranceCharge = 0;
+    
+    if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
+      insuranceCharge = 200.0;
+    }
+
+    const netAmount = parseFloat((totalAmount + taxAmount - discountAmount + insuranceCharge).toFixed(2));
 
     if (netAmount < 0) {
       throw new BadRequestException('Net amount cannot be negative');
@@ -63,6 +72,16 @@ export class OrderService {
 
     // 4. Create Order + OrderItems in a transaction
     return this.prisma.$transaction(async (tx) => {
+      // If insurance is opted and customer does not have active insurance, extend subscription by 1 year
+      if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
+        const oneYearLater = new Date();
+        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        await tx.customer.update({
+          where: { id: customerId },
+          data: { insuranceExpiry: oneYearLater },
+        });
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber,

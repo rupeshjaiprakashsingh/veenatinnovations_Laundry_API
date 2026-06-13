@@ -31,6 +31,10 @@ export class CreateServiceDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
+  @IsOptional()
+  addons?: any;
 }
 
 export class UpdateServiceDto {
@@ -63,4 +67,8 @@ export class UpdateServiceDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
+  @IsOptional()
+  addons?: any;
 }

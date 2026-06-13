@@ -80,6 +80,7 @@ model Service {
   description    String?
   estimatedHours Int?
   isActive       Boolean     @default(true)
+  addons         Json?
   orderItems     OrderItem[]
 
   @@map("services")

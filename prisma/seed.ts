@@ -96,45 +96,96 @@ async function main() {
   console.log(`Delivery staff created: ${delivery.fullName}`);
 
   // 6. Create services
+  console.log('Cleaning existing services...');
+  await prisma.service.deleteMany({});
+
   const servicesData = [
     {
-      serviceName: 'Standard Washing',
+      serviceName: 'Premium Laundry',
       serviceType: 'Washing',
-      price: 15.0,
-      description: 'Thorough wash and dry cycle for casual wear',
-      estimatedHours: 24,
+      price: 179.0,
+      description: '₹179 / kg | 72 Hrs',
+      estimatedHours: 72,
+      addons: [
+        { name: 'Antiviral Cleaning', price: 5.0 },
+        { name: 'Fabric Softener', price: 5.0 }
+      ]
     },
     {
-      serviceName: 'Premium Dry Cleaning',
+      serviceName: 'Shoe Cleaning',
       serviceType: 'Dry Cleaning',
-      price: 45.0,
-      description: 'Eco-friendly chemical cleaning for delicate materials',
-      estimatedHours: 48,
+      price: 299.0,
+      description: 'starting ₹299 / pr | 72 Hrs',
+      estimatedHours: 72,
+      addons: undefined
     },
     {
-      serviceName: 'Steam Ironing',
+      serviceName: 'Steam Press',
       serviceType: 'Ironing',
-      price: 8.0,
-      description: 'Professional steam press for crisp shirts and trousers',
-      estimatedHours: 12,
+      price: 15.0,
+      description: 'starting ₹15 / pc | 48 Hrs',
+      estimatedHours: 48,
+      addons: undefined
     },
     {
-      serviceName: 'Bedsheet Wash',
-      serviceType: 'Washing',
-      price: 80.0,
-      description: 'Premium washing and sanitizing for double bedsheets',
+      serviceName: 'Premium Steam Press',
+      serviceType: 'Ironing',
+      price: 30.0,
+      description: 'starting ₹30 / pc | 24 Hrs',
       estimatedHours: 24,
+      addons: undefined
     },
+    {
+      serviceName: 'Starching',
+      serviceType: 'Ironing',
+      price: 25.0,
+      description: 'starting ₹25 / pc | 48 Hrs',
+      estimatedHours: 48,
+      addons: undefined
+    },
+    {
+      serviceName: 'Bag Cleaning',
+      serviceType: 'Dry Cleaning',
+      price: 249.0,
+      description: 'starting ₹249 / pc | 72 Hrs',
+      estimatedHours: 72,
+      addons: undefined
+    },
+    {
+      serviceName: 'Dry Clean',
+      serviceType: 'Dry Cleaning',
+      price: 109.0,
+      description: 'starting ₹109 / pc | 72 Hrs',
+      estimatedHours: 72,
+      addons: undefined
+    },
+    {
+      serviceName: 'Wash & Fold',
+      serviceType: 'Washing',
+      price: 79.0,
+      description: '₹79 / kg | 96 Hrs',
+      estimatedHours: 96,
+      addons: [
+        { name: 'Antiviral Cleaning', price: 5.0 },
+        { name: 'Fabric Softener', price: 5.0 }
+      ]
+    },
+    {
+      serviceName: 'Wash & Iron',
+      serviceType: 'Washing',
+      price: 119.0,
+      description: '₹119 / kg | 96 Hrs',
+      estimatedHours: 96,
+      addons: [
+        { name: 'Antiviral Cleaning', price: 5.0 },
+        { name: 'Fabric Softener', price: 5.0 }
+      ]
+    }
   ];
 
   for (const s of servicesData) {
-    const service = await prisma.service.findFirst({
-      where: { serviceName: s.serviceName },
-    });
-    if (!service) {
-      await prisma.service.create({ data: s });
-      console.log(`Service created: ${s.serviceName}`);
-    }
+    await prisma.service.create({ data: s });
+    console.log(`Service created: ${s.serviceName}`);
   }
 
   // 7. Create Customer

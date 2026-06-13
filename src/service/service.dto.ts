@@ -32,6 +32,11 @@ export class CreateServiceDto {
   @IsOptional()
   isActive?: boolean;
 
+  @ApiProperty({ example: 'ic_service_premium_laundry', required: false })
+  @IsString()
+  @IsOptional()
+  image?: string;
+
   @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
   @IsOptional()
   addons?: any;
@@ -67,6 +72,11 @@ export class UpdateServiceDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ example: 'ic_service_premium_laundry', required: false })
+  @IsString()
+  @IsOptional()
+  image?: string;
 
   @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
   @IsOptional()

@@ -106,6 +106,7 @@ async function main() {
       price: 179.0,
       description: '₹179 / kg | 72 Hrs',
       estimatedHours: 72,
+      image: 'ic_service_premium_laundry',
       addons: [
         { name: 'Antiviral Cleaning', price: 5.0 },
         { name: 'Fabric Softener', price: 5.0 }
@@ -117,6 +118,7 @@ async function main() {
       price: 299.0,
       description: 'starting ₹299 / pr | 72 Hrs',
       estimatedHours: 72,
+      image: 'ic_service_shoe_cleaning',
       addons: undefined
     },
     {
@@ -125,6 +127,7 @@ async function main() {
       price: 15.0,
       description: 'starting ₹15 / pc | 48 Hrs',
       estimatedHours: 48,
+      image: 'ic_service_steam_press',
       addons: undefined
     },
     {
@@ -133,6 +136,7 @@ async function main() {
       price: 30.0,
       description: 'starting ₹30 / pc | 24 Hrs',
       estimatedHours: 24,
+      image: 'ic_service_prem_steam_press',
       addons: undefined
     },
     {
@@ -141,6 +145,7 @@ async function main() {
       price: 25.0,
       description: 'starting ₹25 / pc | 48 Hrs',
       estimatedHours: 48,
+      image: 'ic_service_starching',
       addons: undefined
     },
     {
@@ -149,6 +154,7 @@ async function main() {
       price: 249.0,
       description: 'starting ₹249 / pc | 72 Hrs',
       estimatedHours: 72,
+      image: 'ic_service_bag_cleaning',
       addons: undefined
     },
     {
@@ -157,6 +163,7 @@ async function main() {
       price: 109.0,
       description: 'starting ₹109 / pc | 72 Hrs',
       estimatedHours: 72,
+      image: 'ic_service_dry_clean',
       addons: undefined
     },
     {
@@ -165,6 +172,7 @@ async function main() {
       price: 79.0,
       description: '₹79 / kg | 96 Hrs',
       estimatedHours: 96,
+      image: 'ic_service_wash_fold',
       addons: [
         { name: 'Antiviral Cleaning', price: 5.0 },
         { name: 'Fabric Softener', price: 5.0 }
@@ -176,6 +184,7 @@ async function main() {
       price: 119.0,
       description: '₹119 / kg | 96 Hrs',
       estimatedHours: 96,
+      image: 'ic_service_wash_iron',
       addons: [
         { name: 'Antiviral Cleaning', price: 5.0 },
         { name: 'Fabric Softener', price: 5.0 }

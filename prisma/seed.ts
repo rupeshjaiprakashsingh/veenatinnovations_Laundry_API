@@ -95,9 +95,9 @@ async function main() {
   });
   console.log(`Delivery staff created: ${delivery.fullName}`);
 
-  // 6. Create services
-  console.log('Cleaning existing services...');
-  await prisma.service.deleteMany({});
+  // 6. Create or update services
+  console.log('Fetching existing services...');
+  const existingServices = await prisma.service.findMany();
 
   const servicesData = [
     {
@@ -193,8 +193,29 @@ async function main() {
   ];
 
   for (const s of servicesData) {
-    await prisma.service.create({ data: s });
-    console.log(`Service created: ${s.serviceName}`);
+    const existing = existingServices.find(es => es.serviceName === s.serviceName);
+    if (existing) {
+      await prisma.service.update({
+        where: { id: existing.id },
+        data: s,
+      });
+      console.log(`Service updated: ${s.serviceName}`);
+    } else {
+      await prisma.service.create({ data: s });
+      console.log(`Service created: ${s.serviceName}`);
+    }
+  }
+
+  // Soft-delete older services not in servicesData
+  const activeNames = servicesData.map(s => s.serviceName);
+  for (const es of existingServices) {
+    if (!activeNames.includes(es.serviceName)) {
+      await prisma.service.update({
+        where: { id: es.id },
+        data: { isActive: false },
+      });
+      console.log(`Service soft-deleted (set isActive to false): ${es.serviceName}`);
+    }
   }
 
   // 7. Create Customer

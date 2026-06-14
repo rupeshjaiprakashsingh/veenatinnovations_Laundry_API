@@ -346,13 +346,14 @@ export class AuthService {
   private async generateTokens(userId: number, email: string, role: string, code: string) {
     const payload = { sub: userId, email, role, code };
 
+    // Access token: 1 year (365 days). Env var overrides the default.
+    const accessTokenExpiry  = (process.env.JWT_EXPIRATION         || '365d') as any;
+    // Refresh token: 1 year as well so users are never forced to re-login.
+    const refreshTokenExpiry = (process.env.JWT_REFRESH_EXPIRATION || '365d') as any;
+
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        expiresIn: (process.env.JWT_EXPIRATION || '365d') as any,
-      }),
-      this.jwtService.signAsync(payload, {
-        expiresIn: (process.env.JWT_REFRESH_EXPIRATION || '365d') as any,
-      }),
+      this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiry  }),
+      this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiry }),
     ]);
 
     return {

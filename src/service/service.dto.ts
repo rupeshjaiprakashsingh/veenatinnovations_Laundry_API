@@ -82,3 +82,81 @@ export class UpdateServiceDto {
   @IsOptional()
   addons?: any;
 }
+
+export class CreateProductDto {
+  @ApiProperty({ example: "Men's Shirt" })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ example: "👕" })
+  @IsString()
+  @IsNotEmpty()
+  emoji!: string;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
+export class UpdateProductDto {
+  @ApiProperty({ example: "Men's Shirt", required: false })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({ example: "👕", required: false })
+  @IsString()
+  @IsOptional()
+  emoji?: string;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
+export class CreateServicePriceDto {
+  @ApiProperty({ example: 3 })
+  @IsNumber()
+  @IsNotEmpty()
+  serviceId!: number;
+
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  @IsNotEmpty()
+  productId!: number;
+
+  @ApiProperty({ example: "400001" })
+  @IsString()
+  @IsNotEmpty()
+  pincode!: string;
+
+  @ApiProperty({ example: 109.0 })
+  @IsNumber()
+  @IsNotEmpty()
+  price!: number;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
+export class UpdateServicePriceDto {
+  @ApiProperty({ example: "400001", required: false })
+  @IsString()
+  @IsOptional()
+  pincode?: string;
+
+  @ApiProperty({ example: 109.0, required: false })
+  @IsNumber()
+  @IsOptional()
+  price?: number;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}

@@ -238,6 +238,144 @@ async function main() {
   });
   console.log(`Customer created: ${customer.firstName} ${customer.lastName}`);
 
+  // 8. Seed Products
+  console.log('Seeding products...');
+  const productsData = [
+    { name: "Men's Shirt", emoji: "👕" },
+    { name: "Men's Jeans/Trousers", emoji: "👖" },
+    { name: "T-Shirt", emoji: "👕" },
+    { name: "Saree (Silk)", emoji: "👘" },
+    { name: "Suit (2-Piece)", emoji: "🧥" },
+    { name: "Kurta Pyjama", emoji: "🥋" },
+    { name: "Saree (Women's)", emoji: "👘" },
+    { name: "Bed Sheet (Double)", emoji: "🛏️" },
+    { name: "Bed Sheet (Single)", emoji: "🛏️" },
+    { name: "Blanket (Single)", emoji: "🛌" },
+    { name: "Blanket (Double)", emoji: "🛌" },
+    { name: "Pillow Cover", emoji: "🧼" }
+  ];
+
+  const dbProducts: any[] = [];
+  for (const p of productsData) {
+    const product = await prisma.product.upsert({
+      where: { name: p.name },
+      update: { emoji: p.emoji },
+      create: p,
+    });
+    dbProducts.push(product);
+  }
+
+  // 9. Seed Service Prices for DEFAULT pincode
+  console.log('Seeding service prices...');
+  const dbServices = await prisma.service.findMany();
+  
+  const dryCleanSvc = dbServices.find(s => s.serviceName === 'Dry Clean');
+  const steamPressSvc = dbServices.find(s => s.serviceName === 'Steam Press');
+  const premiumLaundrySvc = dbServices.find(s => s.serviceName === 'Premium Laundry');
+  const premiumSteamPressSvc = dbServices.find(s => s.serviceName === 'Premium Steam Press');
+
+  const pricesToSeed: any[] = [];
+
+  // Dry Cleaning
+  if (dryCleanSvc) {
+    const base = dryCleanSvc.price; // 109.0
+    pricesToSeed.push(
+      { serviceId: dryCleanSvc.id, productName: "Men's Shirt", price: base * 1.0 },
+      { serviceId: dryCleanSvc.id, productName: "Men's Jeans/Trousers", price: base * 1.2 },
+      { serviceId: dryCleanSvc.id, productName: "T-Shirt", price: base * 0.8 },
+      { serviceId: dryCleanSvc.id, productName: "Saree (Silk)", price: base * 4.0 },
+      { serviceId: dryCleanSvc.id, productName: "Suit (2-Piece)", price: base * 5.0 },
+      { serviceId: dryCleanSvc.id, productName: "Kurta Pyjama", price: base * 2.0 },
+    );
+  }
+
+  // Steam Press
+  if (steamPressSvc) {
+    const base = steamPressSvc.price; // 15.0
+    pricesToSeed.push(
+      { serviceId: steamPressSvc.id, productName: "Men's Shirt", price: base * 1.0 },
+      { serviceId: steamPressSvc.id, productName: "Men's Jeans/Trousers", price: base * 1.25 },
+      { serviceId: steamPressSvc.id, productName: "T-Shirt", price: base * 1.0 },
+      { serviceId: steamPressSvc.id, productName: "Saree (Women's)", price: base * 2.5 },
+      { serviceId: steamPressSvc.id, productName: "Kurta Pyjama", price: base * 1.5 },
+      { serviceId: steamPressSvc.id, productName: "Bed Sheet (Double)", price: base * 3.0 },
+    );
+  }
+
+  // Premium Laundry / Washing
+  if (premiumLaundrySvc) {
+    const base = 15.0; // matching hardcoded washingBasePrice = 15.0
+    pricesToSeed.push(
+      { serviceId: premiumLaundrySvc.id, productName: "Men's Shirt", price: base * 1.0 },
+      { serviceId: premiumLaundrySvc.id, productName: "Men's Jeans/Trousers", price: base * 1.2 },
+      { serviceId: premiumLaundrySvc.id, productName: "T-Shirt", price: base * 0.8 },
+      { serviceId: premiumLaundrySvc.id, productName: "Saree (Women's)", price: base * 2.0 },
+      { serviceId: premiumLaundrySvc.id, productName: "Kurta Pyjama", price: base * 1.5 },
+      { serviceId: premiumLaundrySvc.id, productName: "Bed Sheet (Double)", price: base * 3.0 },
+    );
+  }
+
+  // Premium Steam Press / Bed Sheets
+  if (premiumSteamPressSvc) {
+    const base = 30.0; // matching hardcoded bedSheetsBasePrice = 30.0
+    pricesToSeed.push(
+      { serviceId: premiumSteamPressSvc.id, productName: "Bed Sheet (Single)", price: base * 3.0 },
+      { serviceId: premiumSteamPressSvc.id, productName: "Bed Sheet (Double)", price: base * 5.33 },
+      { serviceId: premiumSteamPressSvc.id, productName: "Blanket (Single)", price: base * 4.0 },
+      { serviceId: premiumSteamPressSvc.id, productName: "Blanket (Double)", price: base * 6.67 },
+      { serviceId: premiumSteamPressSvc.id, productName: "Pillow Cover", price: base * 1.0 },
+    );
+  }
+
+  // Upsert all "DEFAULT" prices
+  for (const pts of pricesToSeed) {
+    const prod = dbProducts.find(p => p.name === pts.productName);
+    if (!prod) continue;
+    
+    await prisma.servicePrice.upsert({
+      where: {
+        serviceId_productId_pincode: {
+          serviceId: pts.serviceId,
+          productId: prod.id,
+          pincode: "DEFAULT"
+        }
+      },
+      update: { price: pts.price },
+      create: {
+        serviceId: pts.serviceId,
+        productId: prod.id,
+        pincode: "DEFAULT",
+        price: pts.price,
+        isActive: true
+      }
+    });
+  }
+
+  // Seed a sample override for pincode '400001'
+  if (steamPressSvc) {
+    const prod = dbProducts.find(p => p.name === "Men's Shirt");
+    if (prod) {
+      await prisma.servicePrice.upsert({
+        where: {
+          serviceId_productId_pincode: {
+            serviceId: steamPressSvc.id,
+            productId: prod.id,
+            pincode: "400001"
+          }
+        },
+        update: { price: 20.0 }, // Override Men's Shirt Steam Press price to 20.0 in 400001
+        create: {
+          serviceId: steamPressSvc.id,
+          productId: prod.id,
+          pincode: "400001",
+          price: 20.0,
+          isActive: true
+        }
+      });
+      console.log("Pincode override seeded for 400001 (Men's Shirt Steam Press: 20.0)");
+    }
+  }
+
   console.log('Seeding completed successfully!');
 }
 

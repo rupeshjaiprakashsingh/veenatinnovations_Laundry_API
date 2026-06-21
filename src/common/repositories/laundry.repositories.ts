@@ -11,6 +11,8 @@ import {
   PickupRequest,
   Delivery,
   Notification,
+  Product,
+  ServicePrice,
 } from '@prisma/client';
 
 @Injectable()
@@ -66,6 +68,20 @@ export class CustomerRepository extends BasePrismaRepository<Customer> {
 export class ServiceRepository extends BasePrismaRepository<Service> {
   constructor(prisma: PrismaService) {
     super(prisma, prisma.service);
+  }
+}
+
+@Injectable()
+export class ProductRepository extends BasePrismaRepository<Product> {
+  constructor(prisma: PrismaService) {
+    super(prisma, prisma.product);
+  }
+}
+
+@Injectable()
+export class ServicePriceRepository extends BasePrismaRepository<ServicePrice> {
+  constructor(prisma: PrismaService) {
+    super(prisma, prisma.servicePrice);
   }
 }
 

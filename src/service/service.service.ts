@@ -1,10 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ServiceRepository } from '../common/repositories/laundry.repositories';
-import { CreateServiceDto, UpdateServiceDto } from './service.dto';
+import { PrismaService } from '../common/prisma/prisma.service';
+import {
+  CreateServiceDto,
+  UpdateServiceDto,
+  CreateProductDto,
+  UpdateProductDto,
+  CreateServicePriceDto,
+  UpdateServicePriceDto,
+} from './service.dto';
 
 @Injectable()
 export class ServiceService {
-  constructor(private readonly serviceRepository: ServiceRepository) {}
+  constructor(
+    private readonly serviceRepository: ServiceRepository,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async create(createServiceDto: CreateServiceDto) {
     return this.serviceRepository.create(createServiceDto);
@@ -30,5 +41,115 @@ export class ServiceService {
   async remove(id: number) {
     await this.findOne(id);
     return this.serviceRepository.delete(id);
+  }
+
+  // Dynamic Pricing Method
+  async getPricing(pincode?: string) {
+    const targetPincode = pincode && pincode.trim().length > 0 ? pincode.trim() : 'DEFAULT';
+
+    const services = await this.prisma.service.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+
+    const products = await this.prisma.product.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+
+    const prices = await this.prisma.servicePrice.findMany({
+      where: {
+        isActive: true,
+        pincode: { in: [targetPincode, 'DEFAULT'] }
+      }
+    });
+
+    return services.map(service => {
+      const serviceProducts = products.map(product => {
+        let matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
+        if (!matchedPrice && targetPincode !== 'DEFAULT') {
+          matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
+        }
+
+        return {
+          id: product.id,
+          name: product.name,
+          emoji: product.emoji,
+          price: matchedPrice ? matchedPrice.price : null,
+          category: service.serviceName
+        };
+      }).filter(p => p.price !== null);
+
+      return {
+        id: service.id,
+        serviceName: service.serviceName,
+        serviceType: service.serviceType,
+        basePrice: service.price,
+        description: service.description,
+        estimatedHours: service.estimatedHours,
+        image: service.image,
+        addons: service.addons,
+        products: serviceProducts
+      };
+    });
+  }
+
+  // --- ADMIN PRODUCT CRUD ---
+  async findAllProducts() {
+    return this.prisma.product.findMany({
+      orderBy: { name: 'asc' }
+    });
+  }
+
+  async createProduct(dto: CreateProductDto) {
+    return this.prisma.product.create({
+      data: dto
+    });
+  }
+
+  async updateProduct(id: number, dto: UpdateProductDto) {
+    return this.prisma.product.update({
+      where: { id },
+      data: dto
+    });
+  }
+
+  async removeProduct(id: number) {
+    return this.prisma.product.delete({
+      where: { id }
+    });
+  }
+
+  // --- ADMIN SERVICE PRICE CRUD ---
+  async findAllServicePrices() {
+    return this.prisma.servicePrice.findMany({
+      include: {
+        service: true,
+        product: true
+      },
+      orderBy: [
+        { pincode: 'asc' },
+        { serviceId: 'asc' }
+      ]
+    });
+  }
+
+  async createServicePrice(dto: CreateServicePriceDto) {
+    return this.prisma.servicePrice.create({
+      data: dto
+    });
+  }
+
+  async updateServicePrice(id: number, dto: UpdateServicePriceDto) {
+    return this.prisma.servicePrice.update({
+      where: { id },
+      data: dto
+    });
+  }
+
+  async removeServicePrice(id: number) {
+    return this.prisma.servicePrice.delete({
+      where: { id }
+    });
   }
 }

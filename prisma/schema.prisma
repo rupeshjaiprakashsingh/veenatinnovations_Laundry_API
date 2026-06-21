@@ -76,18 +76,47 @@ model Employee {
 }
 
 model Service {
-  id             Int         @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   serviceName    String
-  serviceType    String      // Washing, Dry Cleaning, Ironing, etc.
+  serviceType    String         // Washing, Dry Cleaning, Ironing, etc.
   price          Float
   description    String?
   estimatedHours Int?
-  isActive       Boolean     @default(true)
+  isActive       Boolean        @default(true)
   image          String?
   addons         Json?
   orderItems     OrderItem[]
+  prices         ServicePrice[]
 
   @@map("services")
+}
+
+model Product {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  emoji       String
+  isActive    Boolean        @default(true)
+  createdDate DateTime       @default(now())
+  updatedDate DateTime       @updatedAt
+  prices      ServicePrice[]
+
+  @@map("products")
+}
+
+model ServicePrice {
+  id          Int      @id @default(autoincrement())
+  serviceId   Int
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  pincode     String   // Specific pincode or "DEFAULT" for fallback prices
+  price       Float    // Computed final price for this combination
+  isActive    Boolean  @default(true)
+  createdDate DateTime @default(now())
+  updatedDate DateTime @updatedAt
+
+  @@unique([serviceId, productId, pincode])
+  @@map("service_prices")
 }
 
 model Order {

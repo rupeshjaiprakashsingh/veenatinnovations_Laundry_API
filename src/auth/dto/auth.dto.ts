@@ -66,6 +66,11 @@ export class RegisterCustomerDto {
   @IsOptional()
   landmark?: string;
 
+  @ApiProperty({ example: '102 Suite', required: false })
+  @IsString()
+  @IsOptional()
+  houseDetails?: string;
+
   @ApiProperty({ example: 'Male', required: false })
   @IsString()
   @IsOptional()

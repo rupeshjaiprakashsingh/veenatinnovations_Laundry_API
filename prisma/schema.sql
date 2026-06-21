@@ -14,6 +14,7 @@ CREATE TABLE "customers" (
     "state" TEXT,
     "pincode" TEXT,
     "landmark" TEXT,
+    "houseDetails" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedDate" TIMESTAMP(3) NOT NULL,

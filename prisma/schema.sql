@@ -13,6 +13,7 @@ CREATE TABLE "customers" (
     "city" TEXT,
     "state" TEXT,
     "pincode" TEXT,
+    "landmark" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedDate" TIMESTAMP(3) NOT NULL,

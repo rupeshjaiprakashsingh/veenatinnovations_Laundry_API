@@ -18,6 +18,7 @@ model Customer {
   city               String?
   state              String?
   pincode            String?
+  landmark           String?
   isActive           Boolean         @default(true)
   gender             String?
   dob                String?

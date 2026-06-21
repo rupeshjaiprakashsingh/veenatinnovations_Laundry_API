@@ -42,6 +42,11 @@ export class UpdateCustomerDto {
   @IsOptional()
   pincode?: string;
 
+  @ApiProperty({ example: 'Near Mall', required: false })
+  @IsString()
+  @IsOptional()
+  landmark?: string;
+
   @ApiProperty({ example: true, required: false })
   @IsBoolean()
   @IsOptional()

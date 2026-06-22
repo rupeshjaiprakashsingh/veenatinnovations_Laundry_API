@@ -16,7 +16,13 @@ async function main() {
   // 1. Create Main Branch
   const branch = await prisma.branch.upsert({
     where: { branchCode: 'BR-MAIN' },
-    update: {},
+    update: {
+      branchName: 'Main Branch HQ',
+      address: '123 Laundry St, Clean City',
+      contactNumber: '9876543210',
+      email: 'hq@laundry.com',
+      isActive: true,
+    },
     create: {
       branchName: 'Main Branch HQ',
       branchCode: 'BR-MAIN',
@@ -31,7 +37,14 @@ async function main() {
   // 2. Create SuperAdmin
   const admin = await prisma.employee.upsert({
     where: { employeeCode: 'EMP-ADMIN' },
-    update: {},
+    update: {
+      fullName: 'Super Admin',
+      mobileNumber: '9999999999',
+      email: 'admin@laundry.com',
+      role: 'SuperAdmin',
+      password: adminPassword,
+      isActive: true,
+    },
     create: {
       employeeCode: 'EMP-ADMIN',
       fullName: 'Super Admin',
@@ -47,7 +60,15 @@ async function main() {
   // 3. Create Branch Manager
   const manager = await prisma.employee.upsert({
     where: { employeeCode: 'EMP-MGR' },
-    update: {},
+    update: {
+      fullName: 'Branch Manager One',
+      mobileNumber: '9888888888',
+      email: 'manager@laundry.com',
+      role: 'BranchManager',
+      password: managerPassword,
+      branchId: branch.id,
+      isActive: true,
+    },
     create: {
       employeeCode: 'EMP-MGR',
       fullName: 'Branch Manager One',
@@ -64,7 +85,15 @@ async function main() {
   // 4. Create Employee (Staff)
   const staff = await prisma.employee.upsert({
     where: { employeeCode: 'EMP-STAFF' },
-    update: {},
+    update: {
+      fullName: 'Washing Specialist',
+      mobileNumber: '9777777777',
+      email: 'staff@laundry.com',
+      role: 'Employee',
+      password: staffPassword,
+      branchId: branch.id,
+      isActive: true,
+    },
     create: {
       employeeCode: 'EMP-STAFF',
       fullName: 'Washing Specialist',
@@ -81,7 +110,15 @@ async function main() {
   // 5. Create Delivery Boy
   const delivery = await prisma.employee.upsert({
     where: { employeeCode: 'EMP-DELIVERY' },
-    update: {},
+    update: {
+      fullName: 'Swift Delivery Boy',
+      mobileNumber: '9666666666',
+      email: 'delivery@laundry.com',
+      role: 'DeliveryBoy',
+      password: deliveryPassword,
+      branchId: branch.id,
+      isActive: true,
+    },
     create: {
       employeeCode: 'EMP-DELIVERY',
       fullName: 'Swift Delivery Boy',
@@ -221,7 +258,18 @@ async function main() {
   // 7. Create Customer
   const customer = await prisma.customer.upsert({
     where: { customerCode: 'CUST-001' },
-    update: {},
+    update: {
+      firstName: 'John',
+      lastName: 'Doe',
+      mobileNumber: '9555555555',
+      email: 'customer@laundry.com',
+      password: customerPassword,
+      address: '456 Main Rd',
+      city: 'Clean City',
+      state: 'State of Hygiene',
+      pincode: '400001',
+      isActive: true,
+    },
     create: {
       customerCode: 'CUST-001',
       firstName: 'John',

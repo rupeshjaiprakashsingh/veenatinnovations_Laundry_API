@@ -171,8 +171,8 @@ async function main() {
       serviceName: 'Premium Steam Press',
       serviceType: 'Ironing',
       price: 30.0,
-      description: 'starting ₹30 / pc | 24 Hrs',
-      estimatedHours: 24,
+      description: 'starting ₹30 / pc | 48 Hrs',
+      estimatedHours: 48,
       image: 'ic_service_prem_steam_press',
       addons: undefined
     },

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrderRepository, ServiceRepository, CustomerRepository, BranchRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto } from './dto/order.dto';
 
 @Injectable()
 export class OrderService {
@@ -133,9 +133,11 @@ export class OrderService {
       include: {
         customer: true,
         branch: true,
+        laundryShop: true,
         orderItems: { include: { service: true } },
         payments: true,
         deliveries: true,
+        statusHistory: { orderBy: { createdDate: 'asc' } },
       },
       orderBy: { createdDate: 'desc' },
     });
@@ -187,8 +189,103 @@ export class OrderService {
         orderItems: { include: { service: true } },
         payments: true,
         deliveries: true,
+        statusHistory: { orderBy: { createdDate: 'asc' } },
       },
       orderBy: { createdDate: 'desc' },
+    });
+  }
+
+  async assignToShop(orderId: number, dto: AssignShopDto) {
+    const order = await this.findOne(orderId);
+
+    // Validate the laundry shop exists
+    const shop = await this.prisma.laundryShop.findUnique({
+      where: { id: dto.laundryShopId },
+    });
+    if (!shop) {
+      throw new NotFoundException(`Laundry shop with ID ${dto.laundryShopId} not found`);
+    }
+    if (!shop.isActive) {
+      throw new BadRequestException(`Laundry shop "${shop.shopName}" is not active`);
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { laundryShopId: dto.laundryShopId },
+      include: { laundryShop: true, customer: true },
+    });
+
+    // Create a status history entry
+    await this.prisma.orderStatusHistory.create({
+      data: {
+        orderId,
+        status: `Assigned to Laundry: ${shop.shopName}`,
+      },
+    });
+
+    // Notification
+    await this.prisma.notification.create({
+      data: {
+        customerId: order.customerId,
+        message: `Your order ${order.orderNumber} has been assigned to ${shop.shopName} for processing.`,
+        notificationType: 'Push',
+        isSent: true,
+        sentDate: new Date(),
+      },
+    });
+
+    return updated;
+  }
+
+  async bulkAssignToShop(dto: BulkAssignShopDto) {
+    // Validate the laundry shop exists
+    const shop = await this.prisma.laundryShop.findUnique({
+      where: { id: dto.laundryShopId },
+    });
+    if (!shop) {
+      throw new NotFoundException(`Laundry shop with ID ${dto.laundryShopId} not found`);
+    }
+    if (!shop.isActive) {
+      throw new BadRequestException(`Laundry shop "${shop.shopName}" is not active`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Update all orders
+      await tx.order.updateMany({
+        where: { id: { in: dto.orderIds } },
+        data: { laundryShopId: dto.laundryShopId },
+      });
+
+      // Fetch orders for notifications
+      const orders = await tx.order.findMany({
+        where: { id: { in: dto.orderIds } },
+        select: { id: true, orderNumber: true, customerId: true },
+      });
+
+      // Create status history for each order
+      await tx.orderStatusHistory.createMany({
+        data: orders.map((o) => ({
+          orderId: o.id,
+          status: `Assigned to Laundry: ${shop.shopName}`,
+        })),
+      });
+
+      // Create notifications for each customer
+      await tx.notification.createMany({
+        data: orders.map((o) => ({
+          customerId: o.customerId,
+          message: `Your order ${o.orderNumber} has been assigned to ${shop.shopName} for processing.`,
+          notificationType: 'Push',
+          isSent: true,
+          sentDate: new Date(),
+        })),
+      });
+
+      return {
+        assigned: orders.length,
+        laundryShop: shop,
+        orderIds: dto.orderIds,
+      };
     });
   }
 }

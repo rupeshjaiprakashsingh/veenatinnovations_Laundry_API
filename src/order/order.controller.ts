@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Put, Param, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
-import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto } from './dto/order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -63,5 +63,20 @@ export class OrderController {
   @ApiOperation({ summary: 'Update order payment status (Staff only)' })
   updatePaymentStatus(@Param('id', ParseIntPipe) id: number, @Body() updatePaymentStatusDto: UpdatePaymentStatusDto) {
     return this.orderService.updatePaymentStatus(id, updatePaymentStatusDto);
+  }
+
+  @Put(':id/assign-shop')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Assign a single order to a laundry shop' })
+  assignToShop(@Param('id', ParseIntPipe) id: number, @Body() assignShopDto: AssignShopDto) {
+    return this.orderService.assignToShop(id, assignShopDto);
+  }
+
+  @Post('bulk-assign-shop')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Bulk assign multiple orders to a laundry shop' })
+  @ApiResponse({ status: 200, description: 'Orders assigned successfully' })
+  bulkAssignToShop(@Body() bulkAssignDto: BulkAssignShopDto) {
+    return this.orderService.bulkAssignToShop(bulkAssignDto);
   }
 }

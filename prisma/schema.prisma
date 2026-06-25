@@ -119,6 +119,26 @@ model ServicePrice {
   @@map("service_prices")
 }
 
+model LaundryShop {
+  id            Int      @id @default(autoincrement())
+  shopName      String
+  shopCode      String   @unique
+  ownerName     String?
+  contactNumber String?
+  email         String?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  capacity      Int?
+  isActive      Boolean  @default(true)
+  createdDate   DateTime @default(now())
+  updatedDate   DateTime @updatedAt
+  orders        Order[]
+
+  @@map("laundry_shops")
+}
+
 model Order {
   id             Int          @id @default(autoincrement())
   orderNumber    String       @unique
@@ -126,6 +146,8 @@ model Order {
   customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
   branchId       Int
   branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  laundryShopId  Int?
+  laundryShop    LaundryShop? @relation(fields: [laundryShopId], references: [id], onDelete: SetNull)
   pickupDate     DateTime?
   deliveryDate   DateTime?
   orderStatus    String       // New Order, Pickup Scheduled, Picked Up, Processing, Washing, Dry Cleaning, Ironing, Ready For Delivery, Out For Delivery, Delivered, Cancelled

@@ -89,3 +89,23 @@ export class UpdatePaymentStatusDto {
   @IsNotEmpty()
   paymentStatus!: string;
 }
+
+export class AssignShopDto {
+  @ApiProperty({ example: 1, description: 'ID of the laundry shop to assign the order to' })
+  @IsNumber()
+  @IsNotEmpty()
+  laundryShopId!: number;
+}
+
+export class BulkAssignShopDto {
+  @ApiProperty({ example: [1, 2, 3], description: 'Array of order IDs to assign' })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @IsNotEmpty()
+  orderIds!: number[];
+
+  @ApiProperty({ example: 1, description: 'ID of the laundry shop' })
+  @IsNumber()
+  @IsNotEmpty()
+  laundryShopId!: number;
+}

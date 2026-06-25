@@ -99,6 +99,9 @@ export class OrderService {
           orderItems: {
             create: itemsToCreate,
           },
+          statusHistory: {
+            create: { status: 'New Order' }
+          }
         },
         include: {
           orderItems: {
@@ -106,6 +109,7 @@ export class OrderService {
           },
           customer: true,
           branch: true,
+          statusHistory: true,
         },
       });
 
@@ -148,6 +152,14 @@ export class OrderService {
   async updateStatus(id: number, dto: UpdateOrderStatusDto) {
     const order = await this.findOne(id);
     const updated = await this.orderRepository.update(id, { orderStatus: dto.orderStatus });
+
+    // Create status history entry
+    await this.prisma.orderStatusHistory.create({
+      data: {
+        orderId: id,
+        status: dto.orderStatus,
+      },
+    });
 
     // Try to record notification
     await this.prisma.notification.create({

@@ -139,6 +139,7 @@ model Order {
   orderItems     OrderItem[]
   payments       Payment[]
   deliveries     Delivery[]
+  statusHistory  OrderStatusHistory[]
 
   @@map("orders")
 }
@@ -207,4 +208,14 @@ model Notification {
   sentDate         DateTime?
 
   @@map("notifications")
+}
+
+model OrderStatusHistory {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      String
+  createdDate DateTime @default(now())
+
+  @@map("order_status_history")
 }

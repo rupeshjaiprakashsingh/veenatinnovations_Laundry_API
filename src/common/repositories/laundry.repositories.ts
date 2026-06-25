@@ -102,6 +102,9 @@ export class OrderRepository extends BasePrismaRepository<Order> {
         },
         payments: true,
         deliveries: true,
+        statusHistory: {
+          orderBy: { createdDate: 'asc' }
+        },
       },
     });
   }
@@ -117,6 +120,9 @@ export class OrderRepository extends BasePrismaRepository<Order> {
         },
         payments: true,
         deliveries: true,
+        statusHistory: {
+          orderBy: { createdDate: 'asc' }
+        },
       },
     });
   }

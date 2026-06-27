@@ -1,13 +1,13 @@
-import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller, Get, Post, Body, Put, Param, Delete,
+  UseGuards, ParseIntPipe, Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ServiceService } from './service.service';
 import {
-  CreateServiceDto,
-  UpdateServiceDto,
-  CreateProductDto,
-  UpdateProductDto,
-  CreateServicePriceDto,
-  UpdateServicePriceDto,
+  CreateServiceDto, UpdateServiceDto,
+  CreateProductDto, UpdateProductDto,
+  CreateServicePriceDto, UpdateServicePriceDto,
 } from './service.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -19,56 +19,11 @@ import { Public } from '../common/decorators/public.decorator';
 export class ServiceController {
   constructor(private readonly serviceService: ServiceService) {}
 
-  @Post()
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Create a new service (SuperAdmin only)' })
-  @ApiResponse({ status: 201, description: 'Service created successfully' })
-  create(@Body() createServiceDto: CreateServiceDto) {
-    return this.serviceService.create(createServiceDto);
-  }
+  // ──────────────────────────────────────────────────────────────────────────
+  // IMPORTANT: Static/prefixed routes MUST come before :id routes in NestJS!
+  // ──────────────────────────────────────────────────────────────────────────
 
-  @Public() // Anyone can browse laundry service pricing!
-  @Get()
-  @ApiOperation({ summary: 'Get list of all laundry services' })
-  findAll() {
-    return this.serviceService.findAll();
-  }
-
-  @Public()
-  @Get(':id')
-  @ApiOperation({ summary: 'Get service details by ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceService.findOne(id);
-  }
-
-  @Put(':id')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Update service details (SuperAdmin only)' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceDto: UpdateServiceDto) {
-    return this.serviceService.update(id, updateServiceDto);
-  }
-
-  @Delete(':id')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Delete a service (SuperAdmin only)' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceService.remove(id);
-  }
-
-  @Public()
-  @Get('pricing/resolve')
-  @ApiOperation({ summary: 'Get dynamic pricing with pincode overrides' })
-  getPricing(@Query('pincode') pincode?: string) {
-    return this.serviceService.getPricing(pincode);
-  }
-
-  // --- ADMIN PRODUCT ENDPOINTS ---
+  // --- ADMIN PRODUCT ENDPOINTS (must be before :id) ---
   @Get('admin/products')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -105,7 +60,7 @@ export class ServiceController {
     return this.serviceService.removeProduct(id);
   }
 
-  // --- ADMIN SERVICE PRICE ENDPOINTS ---
+  // --- ADMIN SERVICE PRICE ENDPOINTS (must be before :id) ---
   @Get('admin/prices')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -140,5 +95,58 @@ export class ServiceController {
   @ApiOperation({ summary: 'Delete a service price mapping (Admin only)' })
   removeServicePrice(@Param('id', ParseIntPipe) id: number) {
     return this.serviceService.removeServicePrice(id);
+  }
+
+  // --- PUBLIC PRICING RESOLVE (must be before :id) ---
+  @Public()
+  @Get('pricing/resolve')
+  @ApiOperation({ summary: 'Get dynamic pricing with pincode overrides (Android app uses this)' })
+  getPricing(@Query('pincode') pincode?: string) {
+    return this.serviceService.getPricing(pincode);
+  }
+
+  // --- CORE SERVICE CRUD ---
+  @Post()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Create a new service (SuperAdmin only)' })
+  @ApiResponse({ status: 201, description: 'Service created successfully' })
+  create(@Body() createServiceDto: CreateServiceDto) {
+    return this.serviceService.create(createServiceDto);
+  }
+
+  @Public()
+  @Get()
+  @ApiOperation({ summary: 'Get list of all laundry services' })
+  findAll() {
+    return this.serviceService.findAll();
+  }
+
+  @Put(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Update service details (SuperAdmin only)' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceDto: UpdateServiceDto) {
+    return this.serviceService.update(id, updateServiceDto);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Delete a service (SuperAdmin only)' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceService.remove(id);
+  }
+
+  // NOTE: GET :id MUST be LAST — NestJS matches routes top-to-bottom
+  // If it comes before static routes, "pricing" or "admin" would be matched as an ID param.
+  @Public()
+  @Get(':id')
+  @ApiOperation({ summary: 'Get service details by ID' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceService.findOne(id);
   }
 }

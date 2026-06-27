@@ -116,11 +116,22 @@ export class ServiceController {
     return this.serviceService.create(createServiceDto);
   }
 
+  // --- PUBLIC: list active services only (used by Android app GET /services) ---
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Get list of all laundry services' })
+  @ApiOperation({ summary: 'Get all ACTIVE services (Android app)' })
   findAll() {
-    return this.serviceService.findAll();
+    return this.serviceService.findAll(false);
+  }
+
+  // --- ADMIN: list ALL services including inactive ---
+  @Get('admin/all')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Get ALL services including inactive (Admin panel)' })
+  findAllAdmin() {
+    return this.serviceService.findAllAdmin();
   }
 
   @Put(':id')

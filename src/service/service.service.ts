@@ -21,8 +21,15 @@ export class ServiceService {
     return this.serviceRepository.create(createServiceDto);
   }
 
-  async findAll() {
-    return this.serviceRepository.findAll();
+  async findAll(adminView = false) {
+    return this.prisma.service.findMany({
+      where: adminView ? {} : { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  async findAllAdmin() {
+    return this.prisma.service.findMany({ orderBy: { id: 'asc' } });
   }
 
   async findOne(id: number) {
@@ -39,7 +46,18 @@ export class ServiceService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    await this.findOne(id); // throws NotFoundException if not found
+
+    // Check if any order_items reference this service
+    const linkedOrders = await this.prisma.orderItem.count({ where: { serviceId: id } });
+
+    if (linkedOrders > 0) {
+      // Soft-delete: deactivate so it won't appear in the app/pricing
+      await this.prisma.service.update({ where: { id }, data: { isActive: false } });
+      return { message: `Service deactivated (${linkedOrders} order(s) reference it — cannot hard-delete)` };
+    }
+
+    // No linked orders — safe to permanently delete
     return this.serviceRepository.delete(id);
   }
 
@@ -64,34 +82,37 @@ export class ServiceService {
       }
     });
 
-    return services.map(service => {
-      const serviceProducts = products.map(product => {
-        let matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
-        if (!matchedPrice && targetPincode !== 'DEFAULT') {
-          matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
-        }
+    return services
+      .map(service => {
+        const serviceProducts = products.map(product => {
+          let matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
+          if (!matchedPrice && targetPincode !== 'DEFAULT') {
+            matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
+          }
+
+          return {
+            id: product.id,
+            name: product.name,
+            emoji: product.emoji,
+            price: matchedPrice ? matchedPrice.price : null,
+            category: service.serviceName
+          };
+        }).filter(p => p.price !== null);
 
         return {
-          id: product.id,
-          name: product.name,
-          emoji: product.emoji,
-          price: matchedPrice ? matchedPrice.price : null,
-          category: service.serviceName
+          id: service.id,
+          serviceName: service.serviceName,
+          serviceType: service.serviceType,
+          basePrice: service.price,
+          description: service.description,
+          estimatedHours: service.estimatedHours,
+          image: service.image,
+          addons: service.addons,
+          products: serviceProducts
         };
-      }).filter(p => p.price !== null);
-
-      return {
-        id: service.id,
-        serviceName: service.serviceName,
-        serviceType: service.serviceType,
-        basePrice: service.price,
-        description: service.description,
-        estimatedHours: service.estimatedHours,
-        image: service.image,
-        addons: service.addons,
-        products: serviceProducts
-      };
-    });
+      })
+      // Only return services that actually have products with prices configured
+      .filter(s => s.products.length > 0);
   }
 
   // --- ADMIN PRODUCT CRUD ---

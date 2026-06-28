@@ -108,6 +108,7 @@ export class ServiceService {
           estimatedHours: service.estimatedHours,
           image: service.image,
           addons: service.addons,
+          linkedServiceIds: service.linkedServiceIds,
           products: serviceProducts
         };
       })

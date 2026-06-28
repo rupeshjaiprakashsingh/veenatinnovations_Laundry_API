@@ -40,6 +40,10 @@ export class CreateServiceDto {
   @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
   @IsOptional()
   addons?: any;
+
+  @ApiProperty({ example: [3], required: false })
+  @IsOptional()
+  linkedServiceIds?: any;
 }
 
 export class UpdateServiceDto {
@@ -81,6 +85,10 @@ export class UpdateServiceDto {
   @ApiProperty({ example: [{ name: 'Antiviral Cleaning', price: 5.0 }], required: false })
   @IsOptional()
   addons?: any;
+
+  @ApiProperty({ example: [3], required: false })
+  @IsOptional()
+  linkedServiceIds?: any;
 }
 
 export class CreateProductDto {

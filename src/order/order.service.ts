@@ -49,8 +49,13 @@ export class OrderService {
       });
     }
 
-    // 2. Tax details (e.g. 5% GST/tax)
+    // 2. Tax details (e.g. 5% GST/tax) and fees
     const taxAmount = parseFloat((totalAmount * 0.05).toFixed(2));
+    const platformFee = 5.0;
+    
+    // Count total clothes quantity in this order
+    const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
 
     // Check if customer already has active insurance (valid for 1 year or 1 month)
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
@@ -72,7 +77,7 @@ export class OrderService {
     }
 
     const finalDiscount = discountAmount + firstOrderDiscount;
-    const netAmount = parseFloat((totalAmount + taxAmount - finalDiscount + insuranceCharge).toFixed(2));
+    const netAmount = parseFloat((totalAmount + taxAmount + platformFee + deliveryCharge - finalDiscount + insuranceCharge).toFixed(2));
 
     if (netAmount < 0) {
       throw new BadRequestException('Net amount cannot be negative');

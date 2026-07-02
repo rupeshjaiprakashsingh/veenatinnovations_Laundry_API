@@ -242,3 +242,15 @@ model OrderStatusHistory {
 
   @@map("order_status_history")
 }
+
+model Coupon {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  discount    Float
+  description String?
+  isActive    Boolean  @default(true)
+  createdDate DateTime @default(now())
+  updatedDate DateTime @updatedAt
+
+  @@map("coupons")
+}

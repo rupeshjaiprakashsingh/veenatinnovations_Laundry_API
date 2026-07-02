@@ -17,6 +17,7 @@ import { NotificationModule } from './notification/notification.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { LaundryShopModule } from './laundry-shop/laundry-shop.module';
+import { CouponModule } from './coupon/coupon.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { LaundryShopModule } from './laundry-shop/laundry-shop.module';
     DashboardModule,
     ReportsModule,
     LaundryShopModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -52,15 +52,27 @@ export class OrderService {
     // 2. Tax details (e.g. 5% GST/tax)
     const taxAmount = parseFloat((totalAmount * 0.05).toFixed(2));
 
-    // Check if customer already has active insurance (valid for 1 year)
+    // Check if customer already has active insurance (valid for 1 year or 1 month)
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
     
     if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
-      insuranceCharge = 200.0;
+      if (createOrderDto.insuranceType === 'MONTHLY') {
+        insuranceCharge = 50.0;
+      } else {
+        insuranceCharge = 500.0; // default / yearly
+      }
     }
 
-    const netAmount = parseFloat((totalAmount + taxAmount - discountAmount + insuranceCharge).toFixed(2));
+    // Check if this is the customer's first order
+    const orderCount = await this.prisma.order.count({ where: { customerId } });
+    let firstOrderDiscount = 0.0;
+    if (orderCount === 0) {
+      firstOrderDiscount = 20.0; // Apply Rs 20 first order discount
+    }
+
+    const finalDiscount = discountAmount + firstOrderDiscount;
+    const netAmount = parseFloat((totalAmount + taxAmount - finalDiscount + insuranceCharge).toFixed(2));
 
     if (netAmount < 0) {
       throw new BadRequestException('Net amount cannot be negative');
@@ -72,13 +84,17 @@ export class OrderService {
 
     // 4. Create Order + OrderItems in a transaction
     return this.prisma.$transaction(async (tx) => {
-      // If insurance is opted and customer does not have active insurance, extend subscription by 1 year
+      // If insurance is opted and customer does not have active insurance, extend subscription based on type
       if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
-        const oneYearLater = new Date();
-        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        const expiryDate = new Date();
+        if (createOrderDto.insuranceType === 'MONTHLY') {
+          expiryDate.setMonth(expiryDate.getMonth() + 1);
+        } else {
+          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        }
         await tx.customer.update({
           where: { id: customerId },
-          data: { insuranceExpiry: oneYearLater },
+          data: { insuranceExpiry: expiryDate },
         });
       }
 
@@ -92,7 +108,7 @@ export class OrderService {
           orderStatus: 'New Order',
           paymentStatus: 'Pending',
           totalAmount,
-          discountAmount,
+          discountAmount: finalDiscount,
           taxAmount,
           netAmount,
           notes,

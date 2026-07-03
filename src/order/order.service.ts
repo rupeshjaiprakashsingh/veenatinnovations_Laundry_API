@@ -240,7 +240,7 @@ export class OrderService {
     await this.prisma.orderStatusHistory.create({
       data: {
         orderId,
-        status: `Assigned to Laundry: ${shop.shopName}`,
+        status: `Assigned to Laundry`,
       },
     });
 
@@ -248,7 +248,7 @@ export class OrderService {
     await this.prisma.notification.create({
       data: {
         customerId: order.customerId,
-        message: `Your order ${order.orderNumber} has been assigned to ${shop.shopName} for processing.`,
+        message: `Your order ${order.orderNumber} has been assigned to laundry for processing.`,
         notificationType: 'Push',
         isSent: true,
         sentDate: new Date(),
@@ -287,7 +287,7 @@ export class OrderService {
       await tx.orderStatusHistory.createMany({
         data: orders.map((o) => ({
           orderId: o.id,
-          status: `Assigned to Laundry: ${shop.shopName}`,
+          status: `Assigned to Laundry`,
         })),
       });
 
@@ -295,7 +295,7 @@ export class OrderService {
       await tx.notification.createMany({
         data: orders.map((o) => ({
           customerId: o.customerId,
-          message: `Your order ${o.orderNumber} has been assigned to ${shop.shopName} for processing.`,
+          message: `Your order ${o.orderNumber} has been assigned to laundry for processing.`,
           notificationType: 'Push',
           isSent: true,
           sentDate: new Date(),

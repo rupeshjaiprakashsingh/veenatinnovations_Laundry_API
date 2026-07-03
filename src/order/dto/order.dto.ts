@@ -68,19 +68,14 @@ export class CreateOrderDto {
 
 export class UpdateOrderStatusDto {
   @ApiProperty({
-    example: 'Processing',
+    example: 'Laundry',
     enum: [
       'New Order',
-      'Pickup Scheduled',
       'Picked Up',
-      'Processing',
-      'Washing',
-      'Dry Cleaning',
-      'Ironing',
+      'Laundry',
       'Ready For Delivery',
       'Out For Delivery',
       'Delivered',
-      'Cancelled',
     ],
   })
   @IsString()

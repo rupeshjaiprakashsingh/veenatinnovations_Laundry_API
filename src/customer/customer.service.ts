@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CustomerRepository } from '../common/repositories/laundry.repositories';
+import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateCustomerDto } from './customer.dto';
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) {}
+  constructor(
+    private readonly customerRepository: CustomerRepository,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async findAll() {
     return this.customerRepository.findAll();
@@ -15,7 +19,32 @@ export class CustomerService {
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
-    return customer;
+
+    // Check if referral discount is available for this customer
+    let hasReferralDiscount = false;
+    const pendingRefereeReferral = await this.prisma.referral.findUnique({
+      where: { referredId: id },
+    });
+    if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
+      hasReferralDiscount = true;
+    }
+
+    if (!hasReferralDiscount) {
+      const pendingReferrerReferral = await this.prisma.referral.findFirst({
+        where: {
+          referrerId: id,
+          referrerUsed: false,
+        },
+      });
+      if (pendingReferrerReferral) {
+        hasReferralDiscount = true;
+      }
+    }
+
+    return {
+      ...customer,
+      hasReferralDiscount,
+    };
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {

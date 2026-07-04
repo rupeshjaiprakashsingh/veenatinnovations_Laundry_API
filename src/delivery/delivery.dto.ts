@@ -33,4 +33,9 @@ export class UpdateDeliveryStatusDto {
   @IsString()
   @IsOptional()
   deliveryRemarks?: string;
+
+  @ApiProperty({ example: '123456', required: false })
+  @IsString()
+  @IsOptional()
+  deliveryOtp?: string;
 }

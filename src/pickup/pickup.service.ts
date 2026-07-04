@@ -75,7 +75,10 @@ export class PickupService {
           // Update order status to Picked Up
           await tx.order.update({
             where: { id: activeOrder.id },
-            data: { orderStatus: 'Picked Up' },
+            data: {
+              orderStatus: 'Picked Up',
+              laundryShopId: dto.laundryShopId || undefined,
+            },
           });
 
           // Create status history entry

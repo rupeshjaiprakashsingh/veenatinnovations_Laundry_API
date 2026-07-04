@@ -73,7 +73,6 @@ export class UpdateOrderStatusDto {
       'New Order',
       'Picked Up',
       'Laundry',
-      'Ready For Delivery',
       'Out For Delivery',
       'Delivered',
     ],
@@ -108,4 +107,32 @@ export class BulkAssignShopDto {
   @IsNumber()
   @IsNotEmpty()
   laundryShopId!: number;
+}
+
+export class CreateTimeSlotDto {
+  @ApiProperty({ example: '9 AM - 11 AM' })
+  @IsString()
+  @IsNotEmpty()
+  slotName!: string;
+
+  @ApiProperty({ example: 20 })
+  @IsNumber()
+  @IsOptional()
+  maxCapacity?: number;
+}
+
+export class UpdateTimeSlotDto {
+  @ApiProperty({ example: '9 AM - 11 AM', required: false })
+  @IsString()
+  @IsOptional()
+  slotName?: string;
+
+  @ApiProperty({ example: 25, required: false })
+  @IsNumber()
+  @IsOptional()
+  maxCapacity?: number;
+
+  @ApiProperty({ example: true, required: false })
+  @IsOptional()
+  isActive?: boolean;
 }

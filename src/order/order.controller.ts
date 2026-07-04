@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Put, Param, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, Delete, Query, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
-import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto, CreateTimeSlotDto, UpdateTimeSlotDto } from './dto/order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Order Management')
 @ApiBearerAuth()
@@ -78,5 +79,48 @@ export class OrderController {
   @ApiResponse({ status: 200, description: 'Orders assigned successfully' })
   bulkAssignToShop(@Body() bulkAssignDto: BulkAssignShopDto) {
     return this.orderService.bulkAssignToShop(bulkAssignDto);
+  }
+
+  // ── TIME SLOT MANAGEMENT ENDPOINTS ──
+
+  @Public()
+  @Get('time-slots/available')
+  @ApiOperation({ summary: 'Get list of available time slots with their capacity status' })
+  getAvailableSlots(
+    @Query('date') date?: string,
+    @Query('pincode') pincode?: string,
+  ) {
+    return this.orderService.getAvailableSlots(date, pincode);
+  }
+
+  @Get('time-slots/admin')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Get list of all time slots including inactive ones' })
+  getTimeSlotsAdmin() {
+    return this.orderService.getTimeSlotsAdmin();
+  }
+
+  @Post('time-slots')
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Create a new time slot' })
+  createTimeSlot(@Body() dto: CreateTimeSlotDto) {
+    return this.orderService.createTimeSlot(dto);
+  }
+
+  @Put('time-slots/:id')
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Update a time slot' })
+  updateTimeSlot(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTimeSlotDto,
+  ) {
+    return this.orderService.updateTimeSlot(id, dto);
+  }
+
+  @Delete('time-slots/:id')
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Delete a time slot' })
+  deleteTimeSlot(@Param('id', ParseIntPipe) id: number) {
+    return this.orderService.deleteTimeSlot(id);
   }
 }

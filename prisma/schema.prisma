@@ -34,6 +34,8 @@ model Customer {
   orders             Order[]
   pickupRequests     PickupRequest[]
   notifications      Notification[]
+  referralsSent      Referral[]      @relation("ReferrerRelation")
+  referralReceived   Referral?       @relation("ReferredRelation")
 
   @@map("customers")
 }
@@ -164,6 +166,8 @@ model Order {
   deliveries     Delivery[]
   statusHistory  OrderStatusHistory[]
 
+  @@index([customerId])
+  @@index([orderStatus])
   @@map("orders")
 }
 
@@ -205,6 +209,9 @@ model PickupRequest {
   assignedEmployeeId Int?
   assignedEmployee   Employee? @relation(fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
 
+  @@index([customerId])
+  @@index([assignedEmployeeId])
+  @@index([status])
   @@map("pickup_requests")
 }
 
@@ -217,7 +224,10 @@ model Delivery {
   deliveryDate       DateTime?
   deliveryStatus     String    // Pending, OutForDelivery, Delivered, Failed
   deliveryRemarks    String?
+  deliveryOtp        String?
 
+  @@index([deliveryEmployeeId])
+  @@index([deliveryStatus])
   @@map("deliveries")
 }
 
@@ -253,4 +263,31 @@ model Coupon {
   updatedDate DateTime @updatedAt
 
   @@map("coupons")
+}
+
+model TimeSlot {
+  id          Int      @id @default(autoincrement())
+  slotName    String   @unique
+  maxCapacity Int      @default(20)
+  isActive    Boolean  @default(true)
+  createdDate DateTime @default(now())
+  updatedDate DateTime @updatedAt
+
+  @@map("time_slots")
+}
+
+model Referral {
+  id             Int      @id @default(autoincrement())
+  referrerId     Int
+  referredId     Int      @unique
+  referrerUsed   Boolean  @default(false)
+  referredUsed   Boolean  @default(false)
+  createdDate    DateTime @default(now())
+
+  referrer       Customer @relation("ReferrerRelation", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred       Customer @relation("ReferredRelation", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@map("referrals")
 }

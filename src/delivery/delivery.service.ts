@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { DeliveryRepository, OrderRepository, EmployeeRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateDeliveryDto, UpdateDeliveryStatusDto } from './delivery.dto';
+import { NotificationSenderService } from '../notification/notification-sender.service';
 
 @Injectable()
 export class DeliveryService {
@@ -10,6 +11,7 @@ export class DeliveryService {
     private readonly orderRepository: OrderRepository,
     private readonly employeeRepository: EmployeeRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationSender: NotificationSenderService,
   ) {}
 
   async create(dto: CreateDeliveryDto) {
@@ -82,6 +84,32 @@ export class DeliveryService {
           },
         });
 
+        // Automatically pre-create/update the Delivery record so the delivery boy is assigned for both pickup and delivery phase
+        const existingDelivery = await tx.delivery.findFirst({
+          where: { orderId: dto.orderId },
+        });
+
+        if (!existingDelivery) {
+          await tx.delivery.create({
+            data: {
+              orderId: dto.orderId,
+              deliveryEmployeeId: dto.deliveryEmployeeId,
+              deliveryStatus: 'Pending',
+              deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
+              deliveryRemarks: dto.deliveryRemarks,
+            },
+          });
+        } else {
+          await tx.delivery.update({
+            where: { id: existingDelivery.id },
+            data: {
+              deliveryEmployeeId: dto.deliveryEmployeeId,
+              deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
+              deliveryRemarks: dto.deliveryRemarks,
+            },
+          });
+        }
+
         return pickup;
       }
 
@@ -130,6 +158,15 @@ export class DeliveryService {
   async updateStatus(id: number, dto: UpdateDeliveryStatusDto) {
     const delivery = await this.findOne(id);
 
+    if (dto.deliveryStatus === 'Delivered') {
+      if (!dto.deliveryOtp) {
+        throw new BadRequestException('Delivery completion OTP is required');
+      }
+      if (delivery.deliveryOtp !== dto.deliveryOtp) {
+        throw new BadRequestException('Invalid delivery completion OTP');
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedDelivery = await tx.delivery.update({
         where: { id },
@@ -137,29 +174,84 @@ export class DeliveryService {
           deliveryStatus: dto.deliveryStatus,
           deliveryRemarks: dto.deliveryRemarks ?? delivery.deliveryRemarks,
           deliveryDate: dto.deliveryStatus === 'Delivered' ? new Date() : delivery.deliveryDate,
+          deliveryOtp: dto.deliveryStatus === 'Delivered' ? null : delivery.deliveryOtp,
         },
       });
 
       // If delivered, update order status to Delivered
       if (dto.deliveryStatus === 'Delivered') {
-        await tx.order.update({
+        const order = await tx.order.update({
           where: { id: delivery.orderId },
           data: {
             orderStatus: 'Delivered',
             deliveryDate: new Date(),
           },
+          include: { customer: true, orderItems: { include: { service: true } } },
         });
+
+        // Trigger SMS & Email notification here: send invoice and order details!
+        this.notificationSender.sendInvoiceEmail(
+          order.customer.email,
+          order.customer.firstName,
+          order.orderNumber,
+          order.netAmount,
+          order.orderItems
+        ).catch(err => {
+          console.error('Invoice delivery email failed:', err);
+        });
+
+        this.notificationSender.sendSMS(
+          order.customer.mobileNumber,
+          `Veena Innovations Laundry: Your order #${order.orderNumber} has been delivered successfully. Paid Amount: ₹${order.netAmount}. Thank you!`
+        ).catch(err => {
+          console.error('Invoice delivery SMS failed:', err);
+        });
+
       } else if (dto.deliveryStatus === 'Failed') {
         await tx.order.update({
           where: { id: delivery.orderId },
           data: {
-            orderStatus: 'Ready For Delivery', // Fallback to ready
+            orderStatus: 'Laundry', // Fallback to laundry
           },
         });
       }
 
       return updatedDelivery;
     });
+  }
+
+  async requestOtp(id: number) {
+    const delivery = await this.findOne(id);
+    const order = await this.prisma.order.findUnique({
+      where: { id: delivery.orderId },
+      include: { customer: true },
+    });
+
+    if (!order) throw new NotFoundException(`Order for delivery ID ${id} not found`);
+
+    // Generate random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await this.prisma.delivery.update({
+      where: { id },
+      data: { deliveryOtp: otp },
+    });
+
+    // Send OTP via SMS & Email
+    this.notificationSender.sendDeliveryOtp(
+      order.customer.email,
+      order.customer.mobileNumber,
+      order.customer.firstName,
+      order.orderNumber,
+      otp
+    ).catch(err => {
+      console.error('Failed to send delivery verification OTP:', err);
+    });
+
+    return {
+      message: 'Delivery verification OTP has been sent to the customer.',
+      otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+    };
   }
 
   async findByEmployee(employeeId: number) {

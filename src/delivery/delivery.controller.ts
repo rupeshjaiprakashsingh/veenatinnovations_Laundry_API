@@ -53,6 +53,23 @@ export class DeliveryController {
     return delivery;
   }
 
+  @Post(':id/request-otp')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Request delivery verification OTP (Staff & assigned DeliveryBoy)' })
+  async requestOtp(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
+  ) {
+    const { userId, role } = req.user;
+    const delivery = await this.deliveryService.findOne(id);
+
+    if (role === 'DeliveryBoy' && delivery.deliveryEmployeeId !== userId) {
+      throw new ForbiddenException('You can only request OTP for deliveries assigned to you');
+    }
+
+    return this.deliveryService.requestOtp(id);
+  }
+
   @Put(':id/status')
   @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Update delivery status (Staff & assigned DeliveryBoy)' })

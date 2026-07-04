@@ -13,12 +13,14 @@ import {
   RefreshTokenDto,
   PhoneLoginDto,
 } from './dto/auth.dto';
+import { NotificationSenderService } from '../notification/notification-sender.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly notificationSender: NotificationSenderService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -103,6 +105,7 @@ export class AuthService {
     const customerCode = `CUST-${String(count + 1).padStart(4, '0')}`;
 
     // Check if referralCode is valid if provided
+    let referrerId: number | null = null;
     if (dto.referralCode) {
       const referrer = await this.prisma.customer.findFirst({
         where: {
@@ -116,6 +119,7 @@ export class AuthService {
       if (!referrer) {
         throw new BadRequestException('Invalid referral code');
       }
+      referrerId = referrer.id;
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -141,11 +145,27 @@ export class AuthService {
       },
     });
 
+    if (referrerId) {
+      await this.prisma.referral.create({
+        data: {
+          referrerId: referrerId,
+          referredId: customer.id,
+          referrerUsed: false,
+          referredUsed: false,
+        }
+      });
+    }
+
     const tokens = await this.generateTokens(customer.id, customer.email, 'Customer', customer.customerCode);
     
     await this.prisma.customer.update({
       where: { id: customer.id },
       data: { refreshToken: tokens.refreshToken },
+    });
+
+    // Send welcome email
+    this.notificationSender.sendRegistrationEmail(customer.email, customer.firstName).catch(err => {
+      console.error('Welcome email failed:', err);
     });
 
     return {

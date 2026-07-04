@@ -1,17 +1,40 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { OrderRepository, ServiceRepository, CustomerRepository, BranchRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto, CreateTimeSlotDto, UpdateTimeSlotDto } from './dto/order.dto';
+import { NotificationSenderService } from '../notification/notification-sender.service';
 
 @Injectable()
-export class OrderService {
+export class OrderService implements OnModuleInit {
   constructor(
     private readonly orderRepository: OrderRepository,
     private readonly serviceRepository: ServiceRepository,
     private readonly customerRepository: CustomerRepository,
     private readonly branchRepository: BranchRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationSender: NotificationSenderService,
   ) {}
+
+  async onModuleInit() {
+    // Auto-seed default time slots if table is empty
+    const count = await this.prisma.timeSlot.count();
+    if (count === 0) {
+      const defaultSlots = [
+        "8 AM - 9 AM", "9 AM - 10 AM",
+        "10 AM - 11 AM", "11 AM - 12 PM",
+        "12 PM - 1 PM", "4 PM - 5 PM",
+        "5 PM - 6 PM", "6 PM - 7 PM",
+        "7 PM - 8 PM", "8 PM - 9 PM"
+      ];
+      await this.prisma.timeSlot.createMany({
+        data: defaultSlots.map(name => ({
+          slotName: name,
+          maxCapacity: 20,
+        })),
+      });
+      console.log('Seeded default time slots.');
+    }
+  }
 
   async create(createOrderDto: CreateOrderDto) {
     const { customerId, branchId, orderItems, discountAmount = 0, pickupDate, deliveryDate, notes } = createOrderDto;
@@ -78,53 +101,31 @@ export class OrderService {
 
     // ── REFERRAL SYSTEM DISCOUNT (Rs 50) ──
     let referralDiscount = 0.0;
+    let referralToUpdateReferredId: number | null = null;
+    let referralToUpdateReferrerId: number | null = null;
 
-    // A. Referee Discount: If it's the customer's first order, and they registered with a referral code
-    if (orderCount === 0 && customer.referralCode) {
-      const referrer = await this.prisma.customer.findFirst({
-        where: {
-          OR: [
-            { customerCode: customer.referralCode },
-            { mobileNumber: customer.referralCode },
-            { mobileNumber: customer.referralCode.startsWith('+91') ? customer.referralCode.slice(3) : `+91${customer.referralCode}` }
-          ]
-        }
-      });
-      if (referrer) {
-        referralDiscount = 50.0;
-      }
+    // A. Referee Discount: New user gets Rs 50 off on their first order
+    const pendingRefereeReferral = await this.prisma.referral.findUnique({
+      where: { referredId: customerId },
+    });
+    
+    if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
+      referralDiscount += 50.0;
+      referralToUpdateReferredId = pendingRefereeReferral.id;
     }
 
-    // B. Referrer Discount: If this customer referred others who have ordered, and they have unused bonuses
-    const referredCustomers = await this.prisma.customer.findMany({
-      where: {
-        referralCode: { in: [customer.customerCode, customer.mobileNumber] }
-      },
-      select: { id: true }
-    });
-
-    if (referredCustomers.length > 0) {
-      const referredIds = referredCustomers.map(c => c.id);
-
-      // Count referred customers who have completed at least 1 order
-      const completedReferrals = await this.prisma.order.groupBy({
-        by: ['customerId'],
+    // B. Referrer Discount: Referrer gets Rs 50 off for referring someone who signed up
+    if (referralDiscount === 0.0) { // Apply referrer bonus if referee bonus is not already being used on this order
+      const pendingReferrerReferral = await this.prisma.referral.findFirst({
         where: {
-          customerId: { in: referredIds }
-        }
-      });
-      const eligibleBonusCount = completedReferrals.length;
-
-      // Count how many referral discounts this customer has already claimed
-      const usedBonusCount = await this.prisma.order.count({
-        where: {
-          customerId,
-          notes: { contains: 'Referral Discount Applied: Rs 50' }
-        }
+          referrerId: customerId,
+          referrerUsed: false,
+        },
       });
 
-      if (usedBonusCount < eligibleBonusCount) {
+      if (pendingReferrerReferral) {
         referralDiscount += 50.0;
+        referralToUpdateReferrerId = pendingReferrerReferral.id;
       }
     }
 
@@ -156,6 +157,20 @@ export class OrderService {
         await tx.customer.update({
           where: { id: customerId },
           data: { insuranceExpiry: expiryDate },
+        });
+      }
+
+      if (referralToUpdateReferredId) {
+        await tx.referral.update({
+          where: { id: referralToUpdateReferredId },
+          data: { referredUsed: true },
+        });
+      }
+
+      if (referralToUpdateReferrerId) {
+        await tx.referral.update({
+          where: { id: referralToUpdateReferrerId },
+          data: { referrerUsed: true },
         });
       }
 
@@ -201,6 +216,17 @@ export class OrderService {
           isSent: true,
           sentDate: new Date(),
         },
+      });
+
+      // Send order confirmation email
+      this.notificationSender.sendOrderCreatedEmail(
+        order.customer.email,
+        order.customer.firstName,
+        order.orderNumber,
+        order.netAmount,
+        order.orderItems
+      ).catch(err => {
+        console.error('Order created confirmation email failed:', err);
       });
 
       return order;
@@ -365,6 +391,82 @@ export class OrderService {
         laundryShop: shop,
         orderIds: dto.orderIds,
       };
+    });
+  }
+
+  // ── TIME SLOT MANAGEMENT METHODS ──
+
+  async getAvailableSlots(date?: string, pincode?: string) {
+    const targetDate = date ? new Date(date) : new Date();
+    
+    // Set start of day and end of day in UTC
+    const startOfDay = new Date(targetDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const slots = await this.prisma.timeSlot.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+
+    const result: any[] = [];
+    for (const slot of slots) {
+      // Count orders booked in this slot on this date
+      // Optionally filter by pincode if provided
+      const count = await this.prisma.order.count({
+        where: {
+          pickupDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          notes: {
+            contains: `Slot: ${slot.slotName}`,
+          },
+          customer: pincode && pincode.trim().length > 0 ? {
+            pincode: pincode.trim(),
+          } : undefined,
+        },
+      });
+
+      result.push({
+        id: slot.id,
+        slotName: slot.slotName,
+        maxCapacity: slot.maxCapacity,
+        bookedCount: count,
+        isFull: count >= slot.maxCapacity,
+      });
+    }
+
+    return result;
+  }
+
+  async getTimeSlotsAdmin() {
+    return this.prisma.timeSlot.findMany({
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  async createTimeSlot(dto: CreateTimeSlotDto) {
+    return this.prisma.timeSlot.create({
+      data: {
+        slotName: dto.slotName,
+        maxCapacity: dto.maxCapacity ?? 20,
+        isActive: true,
+      },
+    });
+  }
+
+  async updateTimeSlot(id: number, dto: UpdateTimeSlotDto) {
+    return this.prisma.timeSlot.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  async deleteTimeSlot(id: number) {
+    return this.prisma.timeSlot.delete({
+      where: { id },
     });
   }
 }

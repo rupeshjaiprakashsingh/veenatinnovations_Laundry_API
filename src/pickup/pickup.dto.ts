@@ -35,4 +35,9 @@ export class UpdatePickupStatusDto {
   @IsString()
   @IsNotEmpty()
   status!: string;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  laundryShopId?: number;
 }

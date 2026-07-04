@@ -76,8 +76,64 @@ export class OrderService {
       firstOrderDiscount = 20.0; // Apply Rs 20 first order discount
     }
 
-    const finalDiscount = discountAmount + firstOrderDiscount;
-    const netAmount = parseFloat((totalAmount + taxAmount + platformFee + deliveryCharge - finalDiscount + insuranceCharge).toFixed(2));
+    // ── REFERRAL SYSTEM DISCOUNT (Rs 50) ──
+    let referralDiscount = 0.0;
+
+    // A. Referee Discount: If it's the customer's first order, and they registered with a referral code
+    if (orderCount === 0 && customer.referralCode) {
+      const referrer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [
+            { customerCode: customer.referralCode },
+            { mobileNumber: customer.referralCode },
+            { mobileNumber: customer.referralCode.startsWith('+91') ? customer.referralCode.slice(3) : `+91${customer.referralCode}` }
+          ]
+        }
+      });
+      if (referrer) {
+        referralDiscount = 50.0;
+      }
+    }
+
+    // B. Referrer Discount: If this customer referred others who have ordered, and they have unused bonuses
+    const referredCustomers = await this.prisma.customer.findMany({
+      where: {
+        referralCode: { in: [customer.customerCode, customer.mobileNumber] }
+      },
+      select: { id: true }
+    });
+
+    if (referredCustomers.length > 0) {
+      const referredIds = referredCustomers.map(c => c.id);
+
+      // Count referred customers who have completed at least 1 order
+      const completedReferrals = await this.prisma.order.groupBy({
+        by: ['customerId'],
+        where: {
+          customerId: { in: referredIds }
+        }
+      });
+      const eligibleBonusCount = completedReferrals.length;
+
+      // Count how many referral discounts this customer has already claimed
+      const usedBonusCount = await this.prisma.order.count({
+        where: {
+          customerId,
+          notes: { contains: 'Referral Discount Applied: Rs 50' }
+        }
+      });
+
+      if (usedBonusCount < eligibleBonusCount) {
+        referralDiscount += 50.0;
+      }
+    }
+
+    let finalDiscount = discountAmount + firstOrderDiscount + referralDiscount;
+    const baseTotal = totalAmount + taxAmount + platformFee + deliveryCharge + insuranceCharge;
+    if (finalDiscount > baseTotal) {
+      finalDiscount = baseTotal; // Capped at base total
+    }
+    const netAmount = parseFloat((baseTotal - finalDiscount).toFixed(2));
 
     if (netAmount < 0) {
       throw new BadRequestException('Net amount cannot be negative');
@@ -116,7 +172,9 @@ export class OrderService {
           discountAmount: finalDiscount,
           taxAmount,
           netAmount,
-          notes,
+          notes: referralDiscount > 0
+            ? (notes ? `${notes} | Referral Discount Applied: Rs 50` : 'Referral Discount Applied: Rs 50')
+            : notes,
           orderItems: {
             create: itemsToCreate,
           },

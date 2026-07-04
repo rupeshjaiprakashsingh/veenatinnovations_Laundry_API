@@ -13,7 +13,10 @@ export class DeliveryService {
   ) {}
 
   async create(dto: CreateDeliveryDto) {
-    const order = await this.orderRepository.findById(dto.orderId);
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+      include: { customer: true },
+    });
     if (!order) throw new NotFoundException(`Order with ID ${dto.orderId} not found`);
 
     const employee = await this.employeeRepository.findById(dto.deliveryEmployeeId);
@@ -23,6 +26,66 @@ export class DeliveryService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // 1. If order status is "New Order" or "Pickup Scheduled", it is a PICKUP request assignment
+      if (order.orderStatus === 'New Order' || order.orderStatus === 'Pickup Scheduled') {
+        let pickup = await tx.pickupRequest.findFirst({
+          where: {
+            customerId: order.customerId,
+            status: { in: ['Pending', 'Assigned'] },
+          },
+        });
+
+        if (pickup) {
+          pickup = await tx.pickupRequest.update({
+            where: { id: pickup.id },
+            data: {
+              assignedEmployeeId: dto.deliveryEmployeeId,
+              status: 'Assigned',
+            },
+          });
+        } else {
+          const pickupAddress = [
+            order.customer?.houseDetails,
+            order.customer?.landmark,
+            order.customer?.address,
+            order.customer?.city,
+            order.customer?.pincode,
+          ]
+            .filter(Boolean)
+            .join(', ') || 'Customer Address';
+
+          pickup = await tx.pickupRequest.create({
+            data: {
+              customerId: order.customerId,
+              pickupAddress,
+              pickupDate: order.pickupDate ? new Date(order.pickupDate) : new Date(),
+              pickupTime: order.notes?.includes('Slot:')
+                ? order.notes.split('|').find((p) => p.includes('Slot:'))?.replace('Slot:', '').trim() || 'Anytime'
+                : 'Anytime',
+              status: 'Assigned',
+              assignedEmployeeId: dto.deliveryEmployeeId,
+            },
+          });
+        }
+
+        // Update order status to Pickup Scheduled
+        await tx.order.update({
+          where: { id: dto.orderId },
+          data: { orderStatus: 'Pickup Scheduled' },
+        });
+
+        // Add to order status history
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: dto.orderId,
+            status: 'Pickup Scheduled',
+          },
+        });
+
+        return pickup;
+      }
+
+      // 2. Otherwise (Ready For Delivery, Out For Delivery, etc.), it is a DELIVERY assignment
       const delivery = await tx.delivery.create({
         data: {
           orderId: dto.orderId,
@@ -37,6 +100,14 @@ export class DeliveryService {
       await tx.order.update({
         where: { id: dto.orderId },
         data: { orderStatus: 'Out For Delivery' },
+      });
+
+      // Add to order status history
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: dto.orderId,
+          status: 'Out For Delivery',
+        },
       });
 
       return delivery;

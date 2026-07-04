@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PickupRequestRepository, EmployeeRepository, CustomerRepository } from '../common/repositories/laundry.repositories';
 import { CreatePickupRequestDto, AssignPickupDto, UpdatePickupStatusDto } from './pickup.dto';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @Injectable()
 export class PickupService {
@@ -8,6 +9,7 @@ export class PickupService {
     private readonly pickupRepository: PickupRequestRepository,
     private readonly employeeRepository: EmployeeRepository,
     private readonly customerRepository: CustomerRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async create(dto: CreatePickupRequestDto) {
@@ -52,8 +54,42 @@ export class PickupService {
   }
 
   async updateStatus(id: number, dto: UpdatePickupStatusDto) {
-    await this.findOne(id);
-    return this.pickupRepository.update(id, { status: dto.status });
+    const pickup = await this.findOne(id);
+    return this.prisma.$transaction(async (tx) => {
+      const updatedPickup = await tx.pickupRequest.update({
+        where: { id },
+        data: { status: dto.status },
+      });
+
+      if (dto.status === 'Completed') {
+        // Find the active order for this customer in pickup phase (New Order or Pickup Scheduled)
+        const activeOrder = await tx.order.findFirst({
+          where: {
+            customerId: pickup.customerId,
+            orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+          },
+          orderBy: { id: 'desc' },
+        });
+
+        if (activeOrder) {
+          // Update order status to Picked Up
+          await tx.order.update({
+            where: { id: activeOrder.id },
+            data: { orderStatus: 'Picked Up' },
+          });
+
+          // Create status history entry
+          await tx.orderStatusHistory.create({
+            data: {
+              orderId: activeOrder.id,
+              status: 'Picked Up',
+            },
+          });
+        }
+      }
+
+      return updatedPickup;
+    });
   }
 
   async findByCustomer(customerId: number) {

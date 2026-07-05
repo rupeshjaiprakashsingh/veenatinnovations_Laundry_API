@@ -36,8 +36,121 @@ export class OrderService implements OnModuleInit {
     }
   }
 
+  async calculateOrderBillDetails(createOrderDto: CreateOrderDto) {
+    const { customerId, orderItems, couponCode, discountAmount = 0, insuranceOpted, insuranceType } = createOrderDto;
+
+    const customer = await this.customerRepository.findById(customerId);
+    if (!customer) throw new NotFoundException(`Customer with ID ${customerId} not found`);
+
+    let subtotal = 0;
+    const resolvedItems: any[] = [];
+
+    for (const item of orderItems) {
+      const service = await this.serviceRepository.findById(item.serviceId);
+      if (!service) throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
+      if (!service.isActive) throw new BadRequestException(`Service '${service.serviceName}' is not active`);
+
+      const unitPrice = service.price;
+      const totalPrice = unitPrice * item.quantity;
+      subtotal += totalPrice;
+
+      resolvedItems.push({
+        serviceId: item.serviceId,
+        serviceName: service.serviceName,
+        clothType: item.clothType,
+        quantity: item.quantity,
+        unitPrice,
+        totalPrice,
+      });
+    }
+
+    const platformFee = 5.0;
+
+    // Configurable GST/Tax Rate (default 5%)
+    const gstRatePercent = parseFloat(process.env.GST_RATE || '5');
+    const gstRate = gstRatePercent / 100;
+    const taxAmount = parseFloat((subtotal * gstRate).toFixed(2));
+
+    const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
+    const freeDeliverySaving = totalQuantity >= 10 ? 20.0 : 0.0;
+
+    const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
+    let insuranceCharge = 0;
+    if (insuranceOpted && !hasActiveInsurance) {
+      if (insuranceType === 'MONTHLY') {
+        insuranceCharge = 50.0;
+      } else {
+        insuranceCharge = 500.0; // YEARLY
+      }
+    }
+
+    const orderCount = await this.prisma.order.count({ where: { customerId } });
+    const firstOrderDiscount = orderCount === 0 ? 20.0 : 0.0;
+
+    let referralDiscount = 0.0;
+    const pendingRefereeReferral = await this.prisma.referral.findUnique({
+      where: { referredId: customerId },
+    });
+    if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
+      referralDiscount = 50.0;
+    } else {
+      const pendingReferrerReferral = await this.prisma.referral.findFirst({
+        where: { referrerId: customerId, referrerUsed: false },
+      });
+      if (pendingReferrerReferral) {
+        referralDiscount = 50.0;
+      }
+    }
+
+    let couponDiscount = 0.0;
+    let appliedCouponCode: string | undefined = undefined;
+    if (couponCode && couponCode.trim()) {
+      const codeUpper = couponCode.trim().toUpperCase();
+      const coupon = await this.prisma.coupon.findUnique({ where: { code: codeUpper } });
+      if (coupon && coupon.isActive) {
+        couponDiscount = coupon.discount;
+        appliedCouponCode = coupon.code;
+      }
+    } else if (discountAmount > 0) {
+      // Backward compatibility fallback
+      couponDiscount = discountAmount;
+    }
+
+    const grossTotal = subtotal + platformFee + taxAmount + deliveryCharge + insuranceCharge;
+    let totalDiscount = firstOrderDiscount + referralDiscount + couponDiscount;
+
+    if (totalDiscount > grossTotal) {
+      totalDiscount = grossTotal;
+    }
+
+    const netAmount = parseFloat((grossTotal - totalDiscount).toFixed(2));
+    const finalPayable = Math.round(netAmount);
+    const roundOff = parseFloat((finalPayable - netAmount).toFixed(2));
+    const totalSavings = freeDeliverySaving + firstOrderDiscount + referralDiscount + couponDiscount;
+
+    return {
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      platformFee,
+      taxAmount,
+      deliveryCharge,
+      insuranceCharge,
+      firstOrderDiscount,
+      referralDiscount,
+      couponDiscount,
+      couponCode: appliedCouponCode,
+      grossTotal: parseFloat(grossTotal.toFixed(2)),
+      totalDiscount: parseFloat(totalDiscount.toFixed(2)),
+      netAmount,
+      roundOff,
+      finalPayable,
+      totalSavings: parseFloat(totalSavings.toFixed(2)),
+      resolvedItems,
+    };
+  }
+
   async create(createOrderDto: CreateOrderDto) {
-    const { customerId, branchId, orderItems, discountAmount = 0, pickupDate, deliveryDate, notes } = createOrderDto;
+    const { customerId, branchId, orderItems, pickupDate, deliveryDate, notes } = createOrderDto;
 
     // Validate Customer & Branch
     const customer = await this.customerRepository.findById(customerId);
@@ -50,103 +163,46 @@ export class OrderService implements OnModuleInit {
       throw new BadRequestException('Order must contain at least one service item');
     }
 
-    // 1. Calculate price and build item list
-    let totalAmount = 0;
-    const itemsToCreate: any[] = [];
+    // Call unified calculation
+    const bill = await this.calculateOrderBillDetails(createOrderDto);
 
-    for (const item of orderItems) {
-      const service = await this.serviceRepository.findById(item.serviceId);
-      if (!service) throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
-      if (!service.isActive) throw new BadRequestException(`Service '${service.serviceName}' is not active`);
+    // Build items to create
+    const itemsToCreate = bill.resolvedItems.map(item => ({
+      serviceId: item.serviceId,
+      clothType: item.clothType,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+    }));
 
-      const unitPrice = service.price;
-      const totalPrice = unitPrice * item.quantity;
-      totalAmount += totalPrice;
-
-      itemsToCreate.push({
-        serviceId: item.serviceId,
-        clothType: item.clothType,
-        quantity: item.quantity,
-        unitPrice,
-        totalPrice,
-      });
-    }
-
-    // 2. Tax details (e.g. 5% GST/tax) and fees
-    const taxAmount = parseFloat((totalAmount * 0.05).toFixed(2));
-    const platformFee = 5.0;
-    
-    // Count total clothes quantity in this order
-    const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
-
-    // Check if customer already has active insurance (valid for 1 year or 1 month)
-    const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
-    let insuranceCharge = 0;
-    
-    if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
-      if (createOrderDto.insuranceType === 'MONTHLY') {
-        insuranceCharge = 50.0;
-      } else {
-        insuranceCharge = 500.0; // default / yearly
-      }
-    }
-
-    // Check if this is the customer's first order
-    const orderCount = await this.prisma.order.count({ where: { customerId } });
-    let firstOrderDiscount = 0.0;
-    if (orderCount === 0) {
-      firstOrderDiscount = 20.0; // Apply Rs 20 first order discount
-    }
-
-    // ── REFERRAL SYSTEM DISCOUNT (Rs 50) ──
-    let referralDiscount = 0.0;
+    // Find pending referrals to mark as used
     let referralToUpdateReferredId: number | null = null;
     let referralToUpdateReferrerId: number | null = null;
 
-    // A. Referee Discount: New user gets Rs 50 off on their first order
-    const pendingRefereeReferral = await this.prisma.referral.findUnique({
-      where: { referredId: customerId },
-    });
-    
-    if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
-      referralDiscount += 50.0;
-      referralToUpdateReferredId = pendingRefereeReferral.id;
-    }
-
-    // B. Referrer Discount: Referrer gets Rs 50 off for referring someone who signed up
-    if (referralDiscount === 0.0) { // Apply referrer bonus if referee bonus is not already being used on this order
-      const pendingReferrerReferral = await this.prisma.referral.findFirst({
-        where: {
-          referrerId: customerId,
-          referrerUsed: false,
-        },
+    if (bill.referralDiscount > 0) {
+      const pendingRefereeReferral = await this.prisma.referral.findUnique({
+        where: { referredId: customerId },
       });
-
-      if (pendingReferrerReferral) {
-        referralDiscount += 50.0;
-        referralToUpdateReferrerId = pendingReferrerReferral.id;
+      if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
+        referralToUpdateReferredId = pendingRefereeReferral.id;
+      } else {
+        const pendingReferrerReferral = await this.prisma.referral.findFirst({
+          where: { referrerId: customerId, referrerUsed: false },
+        });
+        if (pendingReferrerReferral) {
+          referralToUpdateReferrerId = pendingReferrerReferral.id;
+        }
       }
     }
 
-    let finalDiscount = discountAmount + firstOrderDiscount + referralDiscount;
-    const baseTotal = totalAmount + taxAmount + platformFee + deliveryCharge + insuranceCharge;
-    if (finalDiscount > baseTotal) {
-      finalDiscount = baseTotal; // Capped at base total
-    }
-    const netAmount = parseFloat((baseTotal - finalDiscount).toFixed(2));
-
-    if (netAmount < 0) {
-      throw new BadRequestException('Net amount cannot be negative');
-    }
-
-    // 3. Generate OrderNumber
+    // Generate OrderNumber
     const count = await this.prisma.order.count();
     const orderNumber = `ORD-${String(count + 1).padStart(5, '0')}`;
 
-    // 4. Create Order + OrderItems in a transaction
+    // Create Order + OrderItems in a transaction
     return this.prisma.$transaction(async (tx) => {
-      // If insurance is opted and customer does not have active insurance, extend subscription based on type
+      // If insurance is opted and customer does not have active insurance, extend subscription
+      const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
       if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
         const expiryDate = new Date();
         if (createOrderDto.insuranceType === 'MONTHLY') {
@@ -174,6 +230,10 @@ export class OrderService implements OnModuleInit {
         });
       }
 
+      const orderNotes = bill.couponCode 
+        ? (notes ? `${notes} | Coupon Code Applied: ${bill.couponCode}` : `Coupon Code Applied: ${bill.couponCode}`)
+        : notes;
+
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -183,13 +243,11 @@ export class OrderService implements OnModuleInit {
           deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
           orderStatus: 'New Order',
           paymentStatus: 'Pending',
-          totalAmount,
-          discountAmount: finalDiscount,
-          taxAmount,
-          netAmount,
-          notes: referralDiscount > 0
-            ? (notes ? `${notes} | Referral Discount Applied: Rs 50` : 'Referral Discount Applied: Rs 50')
-            : notes,
+          totalAmount: bill.subtotal,
+          discountAmount: bill.totalDiscount,
+          taxAmount: bill.taxAmount,
+          netAmount: bill.finalPayable,
+          notes: orderNotes,
           orderItems: {
             create: itemsToCreate,
           },
@@ -233,8 +291,59 @@ export class OrderService implements OnModuleInit {
     });
   }
 
+  enrichOrderWithBillingDetails(order: any) {
+    if (!order) return order;
+
+    const subtotal = order.totalAmount;
+    const taxAmount = order.taxAmount;
+    const discountAmount = order.discountAmount;
+    const netAmount = order.netAmount;
+
+    const platformFee = 5.0;
+
+    // Count total clothes quantity
+    const totalQuantity = order.orderItems 
+      ? order.orderItems.reduce((sum: number, item: any) => sum + item.quantity, 0)
+      : 0;
+    
+    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
+    const freeDeliverySaving = totalQuantity >= 10 ? 20.0 : 0.0;
+
+    // Reconstruct insurance charge
+    const reconstructedInsurance = netAmount - subtotal - taxAmount - platformFee - deliveryCharge + discountAmount;
+    const insuranceCharge = reconstructedInsurance > 0 ? parseFloat(reconstructedInsurance.toFixed(2)) : 0.0;
+
+    // Check notes for Coupon Code
+    let couponCode: string | undefined = undefined;
+    if (order.notes && order.notes.includes('Coupon Code Applied:')) {
+      const match = order.notes.match(/Coupon Code Applied:\s*([A-Z0-9_-]+)/i);
+      if (match && match[1]) {
+        couponCode = match[1];
+      }
+    }
+
+    const grossTotal = subtotal + platformFee + taxAmount + deliveryCharge + insuranceCharge;
+    const totalSavings = freeDeliverySaving + discountAmount;
+
+    // Reconstruct roundOff
+    const exactNet = grossTotal - discountAmount;
+    const roundOff = parseFloat((netAmount - exactNet).toFixed(2));
+
+    return {
+      ...order,
+      platformFee,
+      deliveryCharge,
+      insuranceCharge,
+      couponCode,
+      grossTotal: parseFloat(grossTotal.toFixed(2)),
+      roundOff,
+      finalPayable: netAmount,
+      totalSavings: parseFloat(totalSavings.toFixed(2)),
+    };
+  }
+
   async findAll() {
-    return this.orderRepository.findAll({
+    const orders = await this.orderRepository.findAll({
       include: {
         customer: true,
         branch: true,
@@ -246,6 +355,7 @@ export class OrderService implements OnModuleInit {
       },
       orderBy: { createdDate: 'desc' },
     });
+    return orders.map(o => this.enrichOrderWithBillingDetails(o));
   }
 
   async findOne(id: number) {
@@ -253,7 +363,7 @@ export class OrderService implements OnModuleInit {
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
-    return order;
+    return this.enrichOrderWithBillingDetails(order);
   }
 
   async updateStatus(id: number, dto: UpdateOrderStatusDto) {
@@ -279,16 +389,17 @@ export class OrderService implements OnModuleInit {
       },
     });
 
-    return updated;
+    return this.enrichOrderWithBillingDetails(updated);
   }
 
   async updatePaymentStatus(id: number, dto: UpdatePaymentStatusDto) {
     await this.findOne(id);
-    return this.orderRepository.update(id, { paymentStatus: dto.paymentStatus });
+    const updated = await this.orderRepository.update(id, { paymentStatus: dto.paymentStatus });
+    return this.enrichOrderWithBillingDetails(updated);
   }
 
   async findByCustomer(customerId: number) {
-    return this.orderRepository.findAll({
+    const orders = await this.orderRepository.findAll({
       where: { customerId },
       include: {
         orderItems: { include: { service: true } },
@@ -298,6 +409,7 @@ export class OrderService implements OnModuleInit {
       },
       orderBy: { createdDate: 'desc' },
     });
+    return orders.map(o => this.enrichOrderWithBillingDetails(o));
   }
 
   async assignToShop(orderId: number, dto: AssignShopDto) {

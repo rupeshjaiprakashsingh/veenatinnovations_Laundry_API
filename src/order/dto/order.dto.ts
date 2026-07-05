@@ -64,6 +64,11 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   insuranceType?: string;
+
+  @ApiProperty({ example: 'SAVE20', required: false })
+  @IsString()
+  @IsOptional()
+  couponCode?: string;
 }
 
 export class UpdateOrderStatusDto {

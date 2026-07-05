@@ -27,6 +27,13 @@ export class OrderController {
     return this.orderService.create(createOrderDto);
   }
 
+  @Post('calculate')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'Customer')
+  @ApiOperation({ summary: 'Calculate/preview order bill' })
+  calculateBill(@Body() createOrderDto: CreateOrderDto) {
+    return this.orderService.calculateOrderBillDetails(createOrderDto);
+  }
+
   @Get()
   @Roles('SuperAdmin', 'BranchManager', 'Employee')
   @ApiOperation({ summary: 'Get all orders (Staff only)' })

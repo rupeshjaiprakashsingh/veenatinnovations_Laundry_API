@@ -6,21 +6,37 @@ export class NotificationSenderService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER || 'ethereal.user@ethereal.email',
-        pass: process.env.SMTP_PASS || 'ethereal.password',
-      },
-    });
+    const emailService = process.env.EMAIL_SERVICE;
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+
+    if (emailService && emailUser && emailPass) {
+      // Gmail / service-based transport (EMAIL_SERVICE=gmail)
+      this.transporter = nodemailer.createTransport({
+        service: emailService,
+        auth: {
+          user: emailUser,
+          pass: emailPass,
+        },
+      });
+    } else {
+      // SMTP fallback
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.ethereal.email',
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER || 'ethereal.user@ethereal.email',
+          pass: process.env.SMTP_PASS || 'ethereal.password',
+        },
+      });
+    }
   }
 
   async sendEmail(to: string, subject: string, html: string) {
     try {
       const info = await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Veena Innovations Laundry" <no-reply@veenatinnovations.com>',
+        from: `"Veena Innovations Laundry" <${process.env.EMAIL_USER || process.env.SMTP_FROM || 'no-reply@veenatinnovations.com'}>`,
         to,
         subject,
         html,

@@ -32,6 +32,18 @@ describe('OrderService Billing Calculations', () => {
       coupon: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
+      customer: {
+        findUnique: jest.fn().mockResolvedValue({ id: 1, pincode: 'DEFAULT' }),
+      },
+      product: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      servicePrice: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      service: {
+        findUnique: jest.fn().mockResolvedValue({ id: 1, price: 15.50 }),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -65,6 +77,10 @@ describe('OrderService Billing Calculations', () => {
       serviceName: 'Steam Press Shirt',
       price: 15.50,
       isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 1,
+      price: 15.50,
     });
 
     // 5 items, subtotal = 15.5 * 5 = 77.5
@@ -110,6 +126,10 @@ describe('OrderService Billing Calculations', () => {
       price: 100.0,
       isActive: true,
     });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 1,
+      price: 100.0,
+    });
 
     // 10 items, subtotal = 100 * 10 = 1000
     // Platform fee = 5.0
@@ -145,6 +165,10 @@ describe('OrderService Billing Calculations', () => {
       serviceName: 'Steam Press Shirt',
       price: 10.0,
       isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 1,
+      price: 10.0,
     });
 
     // Mock a huge coupon discount (e.g. ₹500 discount)
@@ -194,6 +218,10 @@ describe('OrderService Billing Calculations', () => {
       serviceName: 'Dry Clean Coat',
       price: 100.0,
       isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 1,
+      price: 100.0,
     });
 
     // 1 item, subtotal = 100.0

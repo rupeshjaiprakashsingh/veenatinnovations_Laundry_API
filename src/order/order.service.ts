@@ -36,6 +36,37 @@ export class OrderService implements OnModuleInit {
     }
   }
 
+  async resolveServicePrice(serviceId: number, clothType: string, customerId: number): Promise<number> {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    const pincode = customer?.pincode?.trim() || 'DEFAULT';
+
+    const product = await this.prisma.product.findFirst({
+      where: { name: clothType, isActive: true },
+    });
+
+    if (!product) {
+      const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
+      return service?.price ?? 0.0;
+    }
+
+    let matchedPrice = await this.prisma.servicePrice.findFirst({
+      where: { serviceId, productId: product.id, pincode, isActive: true },
+    });
+
+    if (!matchedPrice && pincode !== 'DEFAULT') {
+      matchedPrice = await this.prisma.servicePrice.findFirst({
+        where: { serviceId, productId: product.id, pincode: 'DEFAULT', isActive: true },
+      });
+    }
+
+    if (matchedPrice) {
+      return matchedPrice.price;
+    }
+
+    const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
+    return service?.price ?? 0.0;
+  }
+
   async calculateOrderBillDetails(createOrderDto: CreateOrderDto) {
     const { customerId, orderItems, couponCode, discountAmount = 0, insuranceOpted, insuranceType } = createOrderDto;
 
@@ -50,7 +81,7 @@ export class OrderService implements OnModuleInit {
       if (!service) throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
       if (!service.isActive) throw new BadRequestException(`Service '${service.serviceName}' is not active`);
 
-      const unitPrice = service.price;
+      const unitPrice = await this.resolveServicePrice(item.serviceId, item.clothType, customerId);
       const totalPrice = unitPrice * item.quantity;
       subtotal += totalPrice;
 

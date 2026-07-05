@@ -40,9 +40,26 @@ export class OrderService implements OnModuleInit {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     const pincode = customer?.pincode?.trim() || 'DEFAULT';
 
-    const product = await this.prisma.product.findFirst({
-      where: { name: clothType, isActive: true },
+    let product = await this.prisma.product.findFirst({
+      where: {
+        name: {
+          equals: clothType.trim(),
+          mode: 'insensitive',
+        },
+        isActive: true,
+      },
     });
+
+    if (!product) {
+      // Fallback: search for active product where name contains clothType or vice versa
+      const allActiveProducts = await this.prisma.product.findMany({
+        where: { isActive: true },
+      });
+      product = allActiveProducts.find(p => 
+        p.name.toLowerCase().includes(clothType.trim().toLowerCase()) || 
+        clothType.trim().toLowerCase().includes(p.name.toLowerCase())
+      ) || null;
+    }
 
     if (!product) {
       const service = await this.prisma.service.findUnique({ where: { id: serviceId } });

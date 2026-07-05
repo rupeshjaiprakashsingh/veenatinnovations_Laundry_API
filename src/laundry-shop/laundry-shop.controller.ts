@@ -17,22 +17,22 @@ export class LaundryShopController {
   constructor(private readonly laundryShopService: LaundryShopService) {}
 
   @Post()
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Create a new laundry shop (SuperAdmin only)' })
+  @Roles('SuperAdmin', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Create a new laundry shop (SuperAdmin and DeliveryBoy)' })
   @ApiResponse({ status: 201, description: 'Laundry shop created successfully' })
   create(@Body() dto: CreateLaundryShopDto) {
     return this.laundryShopService.create(dto);
   }
 
   @Get()
-  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Get all laundry shops with stats' })
   findAll() {
     return this.laundryShopService.findAll();
   }
 
   @Get('suggest')
-  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Suggest laundry shops by customer pincode' })
   @ApiQuery({ name: 'pincode', required: true, example: '560034' })
   suggest(@Query('pincode') pincode: string) {

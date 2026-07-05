@@ -37,6 +37,7 @@ describe('OrderService Billing Calculations', () => {
       },
       product: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       servicePrice: {
         findFirst: jest.fn().mockResolvedValue(null),

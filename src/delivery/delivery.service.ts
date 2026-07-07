@@ -47,11 +47,11 @@ export class DeliveryService {
           });
         } else {
           const pickupAddress = [
-            order.customer?.houseDetails,
-            order.customer?.landmark,
-            order.customer?.address,
-            order.customer?.city,
-            order.customer?.pincode,
+            order.houseDetails || order.customer?.houseDetails,
+            order.landmark || order.customer?.landmark,
+            order.address || order.customer?.address,
+            order.city || order.customer?.city,
+            order.pincode || order.customer?.pincode,
           ]
             .filter(Boolean)
             .join(', ') || 'Customer Address';

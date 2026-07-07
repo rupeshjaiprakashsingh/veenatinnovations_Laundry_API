@@ -69,6 +69,46 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   couponCode?: string;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  addressId?: number;
+
+  @ApiProperty({ example: 'Home', required: false })
+  @IsString()
+  @IsOptional()
+  addressTitle?: string;
+
+  @ApiProperty({ example: '123 Main St', required: false })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({ example: 'Clean City', required: false })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiProperty({ example: 'Hygiene State', required: false })
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @ApiProperty({ example: '400001', required: false })
+  @IsString()
+  @IsOptional()
+  pincode?: string;
+
+  @ApiProperty({ example: 'Near Mall', required: false })
+  @IsString()
+  @IsOptional()
+  landmark?: string;
+
+  @ApiProperty({ example: '102 Suite', required: false })
+  @IsString()
+  @IsOptional()
+  houseDetails?: string;
 }
 
 export class UpdateOrderStatusDto {

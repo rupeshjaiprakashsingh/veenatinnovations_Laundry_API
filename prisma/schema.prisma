@@ -36,6 +36,7 @@ model Customer {
   notifications      Notification[]
   referralsSent      Referral[]      @relation("ReferrerRelation")
   referralReceived   Referral?       @relation("ReferredRelation")
+  addresses          Address[]
 
   @@map("customers")
 }
@@ -166,9 +167,37 @@ model Order {
   deliveries     Delivery[]
   statusHistory  OrderStatusHistory[]
 
+  addressTitle   String?
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+  landmark       String?
+  houseDetails   String?
+
   @@index([customerId])
   @@index([orderStatus])
   @@map("orders")
+}
+
+model Address {
+  id           Int      @id @default(autoincrement())
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title        String   // Home, Office, Other, etc.
+  address      String
+  city         String?
+  state        String?
+  pincode      String?
+  landmark     String?
+  houseDetails String?
+  lat          Float?
+  lng          Float?
+  isDefault    Boolean  @default(false)
+  createdDate  DateTime @default(now())
+  updatedDate  DateTime @updatedAt
+
+  @@map("addresses")
 }
 
 model OrderItem {

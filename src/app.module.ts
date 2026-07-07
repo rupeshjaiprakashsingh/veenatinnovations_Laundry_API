@@ -18,6 +18,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { LaundryShopModule } from './laundry-shop/laundry-shop.module';
 import { CouponModule } from './coupon/coupon.module';
+import { AddressModule } from './address/address.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CouponModule } from './coupon/coupon.module';
     ReportsModule,
     LaundryShopModule,
     CouponModule,
+    AddressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

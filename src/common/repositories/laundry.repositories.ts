@@ -13,6 +13,7 @@ import {
   Notification,
   Product,
   ServicePrice,
+  Address,
 } from '@prisma/client';
 
 @Injectable()
@@ -46,6 +47,7 @@ export class CustomerRepository extends BasePrismaRepository<Customer> {
     return this.prisma.customer.findUnique({
       where: { id },
       include: {
+        addresses: true,
         orders: {
           orderBy: { createdDate: 'desc' },
           include: {
@@ -155,3 +157,11 @@ export class NotificationRepository extends BasePrismaRepository<Notification> {
     super(prisma, prisma.notification);
   }
 }
+
+@Injectable()
+export class AddressRepository extends BasePrismaRepository<Address> {
+  constructor(prisma: PrismaService) {
+    super(prisma, prisma.address);
+  }
+}
+

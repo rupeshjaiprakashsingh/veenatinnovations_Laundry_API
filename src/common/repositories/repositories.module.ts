@@ -11,6 +11,7 @@ import {
   PickupRequestRepository,
   DeliveryRepository,
   NotificationRepository,
+  AddressRepository,
 } from './laundry.repositories';
 
 const repositories = [
@@ -25,6 +26,7 @@ const repositories = [
   PickupRequestRepository,
   DeliveryRepository,
   NotificationRepository,
+  AddressRepository,
 ];
 
 @Global()

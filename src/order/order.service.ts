@@ -36,9 +36,9 @@ export class OrderService implements OnModuleInit {
     }
   }
 
-  async resolveServicePrice(serviceId: number, clothType: string, customerId: number): Promise<number> {
+  async resolveServicePrice(serviceId: number, clothType: string, customerId: number, selectedPincode?: string): Promise<number> {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-    const pincode = customer?.pincode?.trim() || 'DEFAULT';
+    const pincode = selectedPincode || customer?.pincode?.trim() || 'DEFAULT';
 
     let product = await this.prisma.product.findFirst({
       where: {
@@ -85,10 +85,18 @@ export class OrderService implements OnModuleInit {
   }
 
   async calculateOrderBillDetails(createOrderDto: CreateOrderDto) {
-    const { customerId, orderItems, couponCode, discountAmount = 0, insuranceOpted, insuranceType } = createOrderDto;
+    const { customerId, orderItems, couponCode, discountAmount = 0, insuranceOpted, insuranceType, addressId } = createOrderDto;
 
     const customer = await this.customerRepository.findById(customerId);
     if (!customer) throw new NotFoundException(`Customer with ID ${customerId} not found`);
+
+    let selectedPincode = createOrderDto.pincode;
+    if (addressId) {
+      const addr = await this.prisma.address.findUnique({ where: { id: addressId } });
+      if (addr && addr.pincode) {
+        selectedPincode = addr.pincode;
+      }
+    }
 
     let subtotal = 0;
     const resolvedItems: any[] = [];
@@ -98,7 +106,7 @@ export class OrderService implements OnModuleInit {
       if (!service) throw new NotFoundException(`Service with ID ${item.serviceId} not found`);
       if (!service.isActive) throw new BadRequestException(`Service '${service.serviceName}' is not active`);
 
-      const unitPrice = await this.resolveServicePrice(item.serviceId, item.clothType, customerId);
+      const unitPrice = await this.resolveServicePrice(item.serviceId, item.clothType, customerId, selectedPincode);
       const totalPrice = unitPrice * item.quantity;
       subtotal += totalPrice;
 
@@ -198,7 +206,7 @@ export class OrderService implements OnModuleInit {
   }
 
   async create(createOrderDto: CreateOrderDto) {
-    const { customerId, branchId, orderItems, pickupDate, deliveryDate, notes } = createOrderDto;
+    const { customerId, branchId, orderItems, pickupDate, deliveryDate, notes, addressId } = createOrderDto;
 
     // Validate Customer & Branch
     const customer = await this.customerRepository.findById(customerId);
@@ -209,6 +217,51 @@ export class OrderService implements OnModuleInit {
 
     if (orderItems.length === 0) {
       throw new BadRequestException('Order must contain at least one service item');
+    }
+
+    // Resolve address fields for order snapshot
+    let addressTitle = createOrderDto.addressTitle;
+    let address = createOrderDto.address;
+    let city = createOrderDto.city;
+    let state = createOrderDto.state;
+    let pincode = createOrderDto.pincode;
+    let landmark = createOrderDto.landmark;
+    let houseDetails = createOrderDto.houseDetails;
+
+    if (addressId) {
+      const addr = await this.prisma.address.findUnique({
+        where: { id: addressId },
+      });
+      if (addr) {
+        addressTitle = addr.title;
+        address = addr.address;
+        city = addr.city ?? undefined;
+        state = addr.state ?? undefined;
+        pincode = addr.pincode ?? undefined;
+        landmark = addr.landmark ?? undefined;
+        houseDetails = addr.houseDetails ?? undefined;
+      }
+    } else if (!address) {
+      const defaultAddr = await this.prisma.address.findFirst({
+        where: { customerId, isDefault: true },
+      });
+      if (defaultAddr) {
+        addressTitle = defaultAddr.title;
+        address = defaultAddr.address;
+        city = defaultAddr.city ?? undefined;
+        state = defaultAddr.state ?? undefined;
+        pincode = defaultAddr.pincode ?? undefined;
+        landmark = defaultAddr.landmark ?? undefined;
+        houseDetails = defaultAddr.houseDetails ?? undefined;
+      } else {
+        addressTitle = 'Default';
+        address = customer.address ?? undefined;
+        city = customer.city ?? undefined;
+        state = customer.state ?? undefined;
+        pincode = customer.pincode ?? undefined;
+        landmark = customer.landmark ?? undefined;
+        houseDetails = customer.houseDetails ?? undefined;
+      }
     }
 
     // Call unified calculation
@@ -296,6 +349,13 @@ export class OrderService implements OnModuleInit {
           taxAmount: bill.taxAmount,
           netAmount: bill.finalPayable,
           notes: orderNotes,
+          addressTitle,
+          address,
+          city,
+          state,
+          pincode,
+          landmark,
+          houseDetails,
           orderItems: {
             create: itemsToCreate,
           },

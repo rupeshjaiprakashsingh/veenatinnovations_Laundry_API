@@ -29,6 +29,7 @@ export class NotificationSenderService {
         transportOptions.host = 'smtp.gmail.com';
         transportOptions.port = 587;
         transportOptions.secure = false; // false for 587 STARTTLS
+        transportOptions.family = 4; // Force IPv4 to avoid IPv6 ENETUNREACH on Render
       } else {
         transportOptions.service = emailService;
       }

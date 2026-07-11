@@ -6,28 +6,46 @@ export class NotificationSenderService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    const emailService = process.env.EMAIL_SERVICE;
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASS;
+    const emailService = (process.env.EMAIL_SERVICE || '').trim();
+    const emailUser = (process.env.EMAIL_USER || '').trim();
+    const emailPass = (process.env.EMAIL_PASS || '').trim();
 
     if (emailService && emailUser && emailPass) {
-      // Gmail / service-based transport (EMAIL_SERVICE=gmail)
+      const isGmail = emailService.toLowerCase() === 'gmail';
       this.transporter = nodemailer.createTransport({
-        service: emailService,
+        host: isGmail ? 'smtp.gmail.com' : undefined,
+        port: isGmail ? 465 : undefined,
+        secure: isGmail ? true : undefined,
+        service: isGmail ? undefined : emailService,
         auth: {
           user: emailUser,
           pass: emailPass,
         },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+
+      // Verify connection on startup to log any credentials or networking error
+      this.transporter.verify((error) => {
+        if (error) {
+          console.error('[EMAIL SETUP ERROR] SMTP connection verification failed:', error);
+        } else {
+          console.log('[EMAIL SETUP SUCCESS] SMTP server is ready to send notifications');
+        }
       });
     } else {
       // SMTP fallback
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.ethereal.email',
+        host: (process.env.SMTP_HOST || 'smtp.ethereal.email').trim(),
         port: Number(process.env.SMTP_PORT) || 587,
         secure: process.env.SMTP_SECURE === 'true',
         auth: {
-          user: process.env.SMTP_USER || 'ethereal.user@ethereal.email',
-          pass: process.env.SMTP_PASS || 'ethereal.password',
+          user: (process.env.SMTP_USER || 'ethereal.user@ethereal.email').trim(),
+          pass: (process.env.SMTP_PASS || 'ethereal.password').trim(),
+        },
+        tls: {
+          rejectUnauthorized: false,
         },
       });
     }

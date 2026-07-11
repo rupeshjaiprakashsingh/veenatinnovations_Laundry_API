@@ -20,12 +20,15 @@ export class NotificationSenderService {
         tls: {
           rejectUnauthorized: false,
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
       };
 
       if (isGmail) {
         transportOptions.host = 'smtp.gmail.com';
-        transportOptions.port = 465;
-        transportOptions.secure = true;
+        transportOptions.port = 587;
+        transportOptions.secure = false; // false for 587 STARTTLS
       } else {
         transportOptions.service = emailService;
       }
@@ -57,6 +60,9 @@ export class NotificationSenderService {
         tls: {
           rejectUnauthorized: false,
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
       });
     }
   }

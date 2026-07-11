@@ -1,135 +1,104 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import * as net from 'net';
 
 @Injectable()
 export class NotificationSenderService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    // SMTP transporter - used only when Brevo API key is NOT set (local dev)
     const emailService = (process.env.EMAIL_SERVICE || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const emailPass = (process.env.EMAIL_PASS || '').trim();
 
-    if (emailService && emailUser && emailPass) {
-      const isGmail = emailService.toLowerCase() === 'gmail';
-
-      if (isGmail) {
-        // Try port 465 (SSL) first — most reliable on Render
-        // family:4 forces IPv4 to avoid ENETUNREACH on Render's IPv6 stack
-        const transportOptions: any = {
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          family: 4,
-          auth: {
-            user: emailUser,
-            pass: emailPass,
-          },
-          tls: {
-            rejectUnauthorized: false,
-            minVersion: 'TLSv1.2',
-          },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 15000,
-        };
-        console.log('[EMAIL SETUP] Configuring Gmail SMTP: host=smtp.gmail.com port=465 secure=true IPv4');
-        this.transporter = nodemailer.createTransport(transportOptions);
-      } else {
-        this.transporter = nodemailer.createTransport({
-          service: emailService,
-          auth: {
-            user: emailUser,
-            pass: emailPass,
-          },
-          tls: { rejectUnauthorized: false },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 15000,
-        });
-      }
-
-      // Verify connection on startup to log any credentials or networking error
-      this.transporter.verify((error) => {
-        if (error) {
-          console.error('[EMAIL SETUP ERROR] SMTP connection verification failed:', JSON.stringify(error));
-        } else {
-          console.log('[EMAIL SETUP SUCCESS] SMTP server is ready to send notifications');
-        }
-      });
-    } else {
-      // SMTP fallback
-      const smtpHost = (process.env.SMTP_HOST || 'smtp.ethereal.email').trim();
-      const smtpUser = (process.env.SMTP_USER || 'ethereal.user@ethereal.email').trim();
-      const smtpPass = (process.env.SMTP_PASS || 'ethereal.password').trim();
-
-      this.transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-        tls: {
-          rejectUnauthorized: false,
-        },
+    const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+    if (brevoKey) {
+      console.log('[EMAIL SETUP] Using Brevo HTTP API for email sending (Render-compatible)');
+      // No SMTP transporter needed - we use fetch() against Brevo REST API
+    } else if (emailService && emailUser && emailPass) {
+      console.log('[EMAIL SETUP] No BREVO_API_KEY found. Falling back to SMTP (local dev only)');
+      const transportOptions: any = {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        family: 4,
+        auth: { user: emailUser, pass: emailPass },
+        tls: { rejectUnauthorized: false },
         connectionTimeout: 10000,
         greetingTimeout: 10000,
         socketTimeout: 15000,
-      });
+      };
+      this.transporter = nodemailer.createTransport(transportOptions as any);
+    } else {
+      console.warn('[EMAIL SETUP] No email credentials found. Emails will be logged but not sent.');
     }
   }
 
-  private createGmailTransporter(port: number) {
-    const emailUser = (process.env.EMAIL_USER || '').trim();
-    const emailPass = (process.env.EMAIL_PASS || '').trim();
-    const opts = {
-      host: 'smtp.gmail.com',
-      port,
-      secure: port === 465,
-      family: 4,
-      auth: { user: emailUser, pass: emailPass },
-      tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' as const },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
-    };
-    return nodemailer.createTransport(opts as any);
-  }
-
+  /**
+   * Core send method.
+   * Priority: Brevo HTTP API → SMTP (local dev fallback)
+   * Brevo works on Render because it uses HTTPS (port 443), not SMTP ports which Render blocks.
+   */
   async sendEmail(to: string, subject: string, html: string) {
+    const brevoKey = (process.env.BREVO_API_KEY || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
-    const emailService = (process.env.EMAIL_SERVICE || '').trim();
-    const isGmail = emailService.toLowerCase() === 'gmail';
-    const fromLabel = `"Veena Innovations Laundry" <${emailUser || 'no-reply@veenatinnovations.com'}>`;
+    const fromName = 'Veena Innovations Laundry';
+    const fromEmail = emailUser || 'no-reply@veenatinnovations.com';
 
-    // For Gmail: try ports 465 → 587 → 2525 in sequence
-    const ports = isGmail ? [465, 587, 2525] : [null];
-
-    let lastError: any;
-    for (const port of ports) {
-      const transporter = port ? this.createGmailTransporter(port) : this.transporter;
+    // --- Brevo HTTP API (Render-compatible) ---
+    if (brevoKey) {
+      console.log(`[EMAIL SENDING] Brevo API → to=${to} subject="${subject}"`);
       try {
-        console.log(`[EMAIL SENDING] Trying port=${port ?? 'default'} to=${to} subject="${subject}"`);
-        const info = await transporter.sendMail({ from: fromLabel, to, subject, html });
-        console.log(`[EMAIL SENT] Port=${port ?? 'default'} to=${to} messageId=${info.messageId}`);
-        return info;
-      } catch (err: any) {
-        lastError = err;
-        const code = err?.code || err?.message || String(err);
-        console.error(`[EMAIL ERROR] Port=${port ?? 'default'} failed: ${code}`);
-        // Only retry on connection-level errors, not auth errors
-        if (err?.responseCode === 535 || err?.responseCode === 534) {
-          console.error('[EMAIL AUTH ERROR] Invalid credentials — not retrying other ports');
-          throw err;
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'api-key': brevoKey,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { name: fromName, email: fromEmail },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+          }),
+        });
+
+        const responseText = await response.text();
+        if (!response.ok) {
+          console.error(`[EMAIL ERROR] Brevo API error ${response.status}: ${responseText}`);
+          throw new Error(`Brevo API error ${response.status}: ${responseText}`);
         }
+
+        console.log(`[EMAIL SENT] Brevo API → to=${to} status=${response.status}`);
+        return { messageId: `brevo-${Date.now()}`, response: responseText };
+      } catch (err: any) {
+        console.error(`[EMAIL FATAL] Brevo API failed:`, err?.message || err);
+        throw err;
       }
     }
 
-    console.error(`[EMAIL FATAL] All ports exhausted. Last error:`, lastError);
-    throw lastError;
+    // --- SMTP Fallback (local dev) ---
+    if (this.transporter) {
+      console.log(`[EMAIL SENDING] SMTP fallback → to=${to} subject="${subject}"`);
+      try {
+        const info = await this.transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to,
+          subject,
+          html,
+        });
+        console.log(`[EMAIL SENT] SMTP → to=${to} messageId=${info.messageId}`);
+        return info;
+      } catch (err: any) {
+        console.error(`[EMAIL ERROR] SMTP failed:`, err?.message || err);
+        throw err;
+      }
+    }
+
+    // --- No transport configured ---
+    console.warn(`[EMAIL SKIPPED] No transport configured. Would have sent: to=${to} subject="${subject}"`);
+    return { messageId: 'skipped', skipped: true };
   }
 
   async sendSMS(to: string, message: string) {

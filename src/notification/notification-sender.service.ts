@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import * as net from 'net';
 
 @Injectable()
 export class NotificationSenderService {
@@ -12,34 +13,47 @@ export class NotificationSenderService {
 
     if (emailService && emailUser && emailPass) {
       const isGmail = emailService.toLowerCase() === 'gmail';
-      const transportOptions: any = {
-        auth: {
-          user: emailUser,
-          pass: emailPass,
-        },
-        tls: {
-          rejectUnauthorized: false,
-        },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000,
-      };
 
       if (isGmail) {
-        transportOptions.host = 'smtp.gmail.com';
-        transportOptions.port = 587;
-        transportOptions.secure = false; // false for 587 STARTTLS
-        transportOptions.family = 4; // Force IPv4 to avoid IPv6 ENETUNREACH on Render
+        // Try port 465 (SSL) first — most reliable on Render
+        // family:4 forces IPv4 to avoid ENETUNREACH on Render's IPv6 stack
+        const transportOptions: any = {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          family: 4,
+          auth: {
+            user: emailUser,
+            pass: emailPass,
+          },
+          tls: {
+            rejectUnauthorized: false,
+            minVersion: 'TLSv1.2',
+          },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
+        };
+        console.log('[EMAIL SETUP] Configuring Gmail SMTP: host=smtp.gmail.com port=465 secure=true IPv4');
+        this.transporter = nodemailer.createTransport(transportOptions);
       } else {
-        transportOptions.service = emailService;
+        this.transporter = nodemailer.createTransport({
+          service: emailService,
+          auth: {
+            user: emailUser,
+            pass: emailPass,
+          },
+          tls: { rejectUnauthorized: false },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
+        });
       }
-
-      this.transporter = nodemailer.createTransport(transportOptions);
 
       // Verify connection on startup to log any credentials or networking error
       this.transporter.verify((error) => {
         if (error) {
-          console.error('[EMAIL SETUP ERROR] SMTP connection verification failed:', error);
+          console.error('[EMAIL SETUP ERROR] SMTP connection verification failed:', JSON.stringify(error));
         } else {
           console.log('[EMAIL SETUP SUCCESS] SMTP server is ready to send notifications');
         }
@@ -61,31 +75,61 @@ export class NotificationSenderService {
         tls: {
           rejectUnauthorized: false,
         },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       });
     }
   }
 
-  async sendEmail(to: string, subject: string, html: string) {
-    try {
-      const emailUser = (process.env.EMAIL_USER || '').trim();
-      const host = (this.transporter.options as any).host || (this.transporter.options as any).service || 'unknown';
-      console.log(`[EMAIL SENDING] Attempting to send email to ${to}. Subject: "${subject}". Host: ${host}. From: ${emailUser}`);
+  private createGmailTransporter(port: number) {
+    const emailUser = (process.env.EMAIL_USER || '').trim();
+    const emailPass = (process.env.EMAIL_PASS || '').trim();
+    const opts = {
+      host: 'smtp.gmail.com',
+      port,
+      secure: port === 465,
+      family: 4,
+      auth: { user: emailUser, pass: emailPass },
+      tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' as const },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    };
+    return nodemailer.createTransport(opts as any);
+  }
 
-      const info = await this.transporter.sendMail({
-        from: `"Veena Innovations Laundry" <${emailUser || process.env.SMTP_FROM || 'no-reply@veenatinnovations.com'}>`,
-        to,
-        subject,
-        html,
-      });
-      console.log(`[EMAIL SENT] Subject: "${subject}" to ${to}. MessageId: ${info.messageId}`);
-      return info;
-    } catch (error) {
-      console.error(`[EMAIL ERROR] Failed to send email to ${to}:`, error);
-      throw error;
+  async sendEmail(to: string, subject: string, html: string) {
+    const emailUser = (process.env.EMAIL_USER || '').trim();
+    const emailService = (process.env.EMAIL_SERVICE || '').trim();
+    const isGmail = emailService.toLowerCase() === 'gmail';
+    const fromLabel = `"Veena Innovations Laundry" <${emailUser || 'no-reply@veenatinnovations.com'}>`;
+
+    // For Gmail: try ports 465 → 587 → 2525 in sequence
+    const ports = isGmail ? [465, 587, 2525] : [null];
+
+    let lastError: any;
+    for (const port of ports) {
+      const transporter = port ? this.createGmailTransporter(port) : this.transporter;
+      try {
+        console.log(`[EMAIL SENDING] Trying port=${port ?? 'default'} to=${to} subject="${subject}"`);
+        const info = await transporter.sendMail({ from: fromLabel, to, subject, html });
+        console.log(`[EMAIL SENT] Port=${port ?? 'default'} to=${to} messageId=${info.messageId}`);
+        return info;
+      } catch (err: any) {
+        lastError = err;
+        const code = err?.code || err?.message || String(err);
+        console.error(`[EMAIL ERROR] Port=${port ?? 'default'} failed: ${code}`);
+        // Only retry on connection-level errors, not auth errors
+        if (err?.responseCode === 535 || err?.responseCode === 534) {
+          console.error('[EMAIL AUTH ERROR] Invalid credentials — not retrying other ports');
+          throw err;
+        }
+      }
     }
+
+    console.error(`[EMAIL FATAL] All ports exhausted. Last error:`, lastError);
+    throw lastError;
   }
 
   async sendSMS(to: string, message: string) {

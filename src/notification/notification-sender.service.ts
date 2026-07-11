@@ -12,11 +12,7 @@ export class NotificationSenderService {
 
     if (emailService && emailUser && emailPass) {
       const isGmail = emailService.toLowerCase() === 'gmail';
-      this.transporter = nodemailer.createTransport({
-        host: isGmail ? 'smtp.gmail.com' : undefined,
-        port: isGmail ? 465 : undefined,
-        secure: isGmail ? true : undefined,
-        service: isGmail ? undefined : emailService,
+      const transportOptions: any = {
         auth: {
           user: emailUser,
           pass: emailPass,
@@ -24,7 +20,17 @@ export class NotificationSenderService {
         tls: {
           rejectUnauthorized: false,
         },
-      });
+      };
+
+      if (isGmail) {
+        transportOptions.host = 'smtp.gmail.com';
+        transportOptions.port = 465;
+        transportOptions.secure = true;
+      } else {
+        transportOptions.service = emailService;
+      }
+
+      this.transporter = nodemailer.createTransport(transportOptions);
 
       // Verify connection on startup to log any credentials or networking error
       this.transporter.verify((error) => {
@@ -36,13 +42,17 @@ export class NotificationSenderService {
       });
     } else {
       // SMTP fallback
+      const smtpHost = (process.env.SMTP_HOST || 'smtp.ethereal.email').trim();
+      const smtpUser = (process.env.SMTP_USER || 'ethereal.user@ethereal.email').trim();
+      const smtpPass = (process.env.SMTP_PASS || 'ethereal.password').trim();
+
       this.transporter = nodemailer.createTransport({
-        host: (process.env.SMTP_HOST || 'smtp.ethereal.email').trim(),
+        host: smtpHost,
         port: Number(process.env.SMTP_PORT) || 587,
         secure: process.env.SMTP_SECURE === 'true',
         auth: {
-          user: (process.env.SMTP_USER || 'ethereal.user@ethereal.email').trim(),
-          pass: (process.env.SMTP_PASS || 'ethereal.password').trim(),
+          user: smtpUser,
+          pass: smtpPass,
         },
         tls: {
           rejectUnauthorized: false,

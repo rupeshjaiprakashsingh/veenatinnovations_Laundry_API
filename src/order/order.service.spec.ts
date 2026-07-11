@@ -87,13 +87,13 @@ describe('OrderService Billing Calculations', () => {
     // 5 items, subtotal = 15.5 * 5 = 77.5
     // Platform fee = 5.0
     // GST (5%) = 77.5 * 0.05 = 3.88
-    // Delivery charge = 20.0 (items < 10)
-    // First order discount = 20.0 (count = 0)
-    // Gross total = 77.5 + 5.0 + 3.88 + 20.0 = 106.38
-    // Net amount = 106.38 - 20 = 86.38
-    // Final payable = Math.round(86.38) = 86
-    // Round off = 86 - 86.38 = -0.38
-    // Total savings = 20.0 (first order discount)
+    // Delivery charge = 0.0 (first order, count = 0)
+    // First order discount = 0.0 (quantity <= 5)
+    // Gross total = 77.5 + 5.0 + 3.88 + 0.0 = 86.38
+    // Net amount = 86.38
+    // Final payable = 86.38
+    // Round off = 0.0
+    // Total savings = 20.0 (free delivery saving)
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -107,11 +107,11 @@ describe('OrderService Billing Calculations', () => {
     expect(result.subtotal).toBe(77.5);
     expect(result.platformFee).toBe(5.0);
     expect(result.taxAmount).toBe(3.88);
-    expect(result.deliveryCharge).toBe(20.0);
-    expect(result.grossTotal).toBe(106.38);
+    expect(result.deliveryCharge).toBe(0.0);
+    expect(result.grossTotal).toBe(86.38);
     expect(result.netAmount).toBe(86.38);
-    expect(result.finalPayable).toBe(86);
-    expect(result.roundOff).toBe(-0.38);
+    expect(result.finalPayable).toBe(86.38);
+    expect(result.roundOff).toBe(0.0);
     expect(result.totalSavings).toBe(20.0);
   });
 
@@ -135,12 +135,12 @@ describe('OrderService Billing Calculations', () => {
     // 10 items, subtotal = 100 * 10 = 1000
     // Platform fee = 5.0
     // GST (5%) = 1000 * 0.05 = 50.0
-    // Delivery charge = 0.0 (items >= 10)
-    // First order discount = 20.0
+    // Delivery charge = 0.0 (first order, count = 0)
+    // First order discount = 50.0 (quantity > 5)
     // Gross total = 1000 + 5.0 + 50.0 + 0 = 1055.0
-    // Net amount = 1055.0 - 20 = 1035.0
-    // Final payable = 1035
-    // Total savings = 20 (free delivery saving) + 20 (first order) = 40.0
+    // Net amount = 1055.0 - 50 = 1005.0
+    // Final payable = 1005.0
+    // Total savings = 20.0 (free delivery saving) + 50.0 (first order discount) = 70.0
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -151,8 +151,8 @@ describe('OrderService Billing Calculations', () => {
     });
 
     expect(result.deliveryCharge).toBe(0.0);
-    expect(result.totalSavings).toBe(40.0);
-    expect(result.finalPayable).toBe(1035);
+    expect(result.totalSavings).toBe(70.0);
+    expect(result.finalPayable).toBe(1005.0);
   });
 
   it('should ensure final payable is never negative even if discounts exceed gross total', async () => {
@@ -182,14 +182,14 @@ describe('OrderService Billing Calculations', () => {
     // 1 item, subtotal = 10.0
     // Platform fee = 5.0
     // GST (5%) = 0.50
-    // Delivery charge = 20.0
-    // First order discount = 20.0
+    // Delivery charge = 0.0 (first order, count = 0)
+    // First order discount = 0.0
     // Coupon discount = 500.0
-    // Gross total = 10 + 5 + 0.50 + 20 = 35.50
-    // Total discount = 20 (first order) + 500 (coupon) = 520.0
-    // Cap total discount at gross total (35.50)
+    // Gross total = 10 + 5 + 0.50 + 0.0 = 15.50
+    // Total discount = 500.0
+    // Cap total discount at gross total (15.50)
     // Net amount = 0.0
-    // Final payable = 0
+    // Final payable = 0.0
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -200,9 +200,9 @@ describe('OrderService Billing Calculations', () => {
       couponCode: 'SUPERMEGA',
     });
 
-    expect(result.totalDiscount).toBe(35.50);
+    expect(result.totalDiscount).toBe(15.50);
     expect(result.netAmount).toBe(0.0);
-    expect(result.finalPayable).toBe(0);
+    expect(result.finalPayable).toBe(0.0);
   });
 
   it('should use configurable GST rate from process.env', async () => {

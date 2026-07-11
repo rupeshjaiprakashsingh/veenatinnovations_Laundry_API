@@ -183,8 +183,8 @@ export class OrderService implements OnModuleInit {
     }
 
     const netAmount = parseFloat((grossTotal - totalDiscount).toFixed(2));
-    const finalPayable = Math.round(netAmount);
-    const roundOff = parseFloat((finalPayable - netAmount).toFixed(2));
+    const finalPayable = netAmount;
+    const roundOff = 0.0;
     const totalSavings = freeDeliverySaving + firstOrderDiscount + referralDiscount + couponDiscount;
 
     return {

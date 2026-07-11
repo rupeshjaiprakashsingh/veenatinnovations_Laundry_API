@@ -25,7 +25,7 @@ export class BannerController {
   @Get('admin/all')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
+  @Roles('SuperAdmin', 'BranchManager')
   @ApiOperation({ summary: 'Get all banners including inactive ones (Admin Panel only)' })
   findAllAdmin() {
     return this.bannerService.findAll(false);
@@ -34,8 +34,8 @@ export class BannerController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Create a new banner (SuperAdmin only)' })
+  @Roles('SuperAdmin', 'BranchManager')
+  @ApiOperation({ summary: 'Create a new banner (Staff only)' })
   create(@Body() dto: CreateBannerDto) {
     return this.bannerService.create(dto);
   }
@@ -43,8 +43,8 @@ export class BannerController {
   @Put(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Update a banner (SuperAdmin only)' })
+  @Roles('SuperAdmin', 'BranchManager')
+  @ApiOperation({ summary: 'Update a banner (Staff only)' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBannerDto) {
     return this.bannerService.update(id, dto);
   }
@@ -52,8 +52,8 @@ export class BannerController {
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
-  @ApiOperation({ summary: 'Delete a banner (SuperAdmin only)' })
+  @Roles('SuperAdmin', 'BranchManager')
+  @ApiOperation({ summary: 'Delete a banner (Staff only)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.bannerService.remove(id);
   }

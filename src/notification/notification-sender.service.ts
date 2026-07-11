@@ -164,4 +164,122 @@ export class NotificationSenderService {
     await this.sendEmail(toEmail, 'Delivery OTP Verification', html);
     await this.sendSMS(toMobile, `Veena Innovations Laundry: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
   }
+
+  async sendPaymentReceivedEmail(to: string, name: string, orderNumber: string, amount: number, paymentMode: string, transactionReference?: string) {
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #10B981; margin: 0; font-size: 24px; font-weight: 700;">Payment Received!</h2>
+          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Thank you for your payment.</p>
+        </div>
+        
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear ${name},</p>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">We have successfully received and processed your payment for order <strong>#${orderNumber}</strong>.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="color: #1e293b; margin-top: 0; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Transaction Details</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #475569;">
+            <tr>
+              <td style="padding: 6px 0; font-weight: 600;">Amount Paid:</td>
+              <td style="padding: 6px 0; text-align: right; color: #10B981; font-weight: 700; font-size: 16px;">₹${amount}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-weight: 600;">Payment Method:</td>
+              <td style="padding: 6px 0; text-align: right;">${paymentMode}</td>
+            </tr>
+            ${transactionReference ? `
+            <tr>
+              <td style="padding: 6px 0; font-weight: 600;">Transaction Ref:</td>
+              <td style="padding: 6px 0; text-align: right; font-family: monospace;">${transactionReference}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+        
+        <p style="color: #334155; font-size: 14px; line-height: 1.5;">If you have any questions regarding this transaction, please reply to this email or contact our customer support.</p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Veena Innovations Laundry. All rights reserved.</p>
+      </div>
+    `;
+    await this.sendEmail(to, `Payment Confirmation: Order #${orderNumber}`, html);
+  }
+
+  async sendOrderStatusUpdateEmail(to: string, name: string, orderNumber: string, status: string) {
+    let statusDescription = `Your order status has been updated to ${status}.`;
+    let statusColor = '#4F46E5'; // indigo
+    let icon = '🔄';
+
+    switch (status) {
+      case 'Pickup Scheduled':
+        statusDescription = 'A delivery agent has been assigned and is on the way to pick up your clothes.';
+        statusColor = '#3B82F6'; // blue
+        icon = '🛵';
+        break;
+      case 'Picked Up':
+        statusDescription = 'Your clothes have been successfully picked up and are on the way to our laundry facility.';
+        statusColor = '#8B5CF6'; // purple
+        icon = '👕';
+        break;
+      case 'Processing':
+        statusDescription = 'Your clothes are being sorted and prepared for laundry.';
+        statusColor = '#EAB308'; // yellow
+        icon = '🧼';
+        break;
+      case 'Washing':
+        statusDescription = 'Your clothes are currently undergoing the washing process.';
+        statusColor = '#06B6D4'; // cyan
+        icon = '🌊';
+        break;
+      case 'Ironing':
+        statusDescription = 'Your clothes are being ironed and steam-pressed to perfection.';
+        statusColor = '#F97316'; // orange
+        icon = '💨';
+        break;
+      case 'Ready For Delivery':
+        statusDescription = 'Good news! Your clean clothes are ready and packed for delivery.';
+        statusColor = '#10B981'; // green
+        icon = '📦';
+        break;
+      case 'Out For Delivery':
+        statusDescription = 'Your clean clothes have been handed over to our delivery partner and are out for delivery.';
+        statusColor = '#06B6D4'; // cyan
+        icon = '🛵';
+        break;
+      case 'Delivered':
+        statusDescription = 'Your order has been successfully delivered! Thank you for choosing Veena Innovations Laundry.';
+        statusColor = '#10B981'; // green
+        icon = '🎉';
+        break;
+      case 'Cancelled':
+        statusDescription = 'Your order has been cancelled.';
+        statusColor = '#EF4444'; // red
+        icon = '❌';
+        break;
+    }
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <span style="font-size: 40px; margin-bottom: 10px; display: inline-block;">${icon}</span>
+          <h2 style="color: ${statusColor}; margin: 0; font-size: 24px; font-weight: 700;">Order Status Update</h2>
+          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Order #${orderNumber}</p>
+        </div>
+        
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear ${name},</p>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">The status of your laundry order <strong>#${orderNumber}</strong> has changed:</p>
+        
+        <div style="background-color: #f8fafc; border-left: 4px solid ${statusColor}; border-radius: 4px; padding: 15px 20px; margin: 20px 0;">
+          <h3 style="color: ${statusColor}; margin: 0 0 5px 0; font-size: 16px; font-weight: 700;">${status}</h3>
+          <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.5;">${statusDescription}</p>
+        </div>
+        
+        <p style="color: #334155; font-size: 14px; line-height: 1.5;">You can track the progress of your order live inside our Grivana app.</p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Veena Innovations Laundry. All rights reserved.</p>
+      </div>
+    `;
+    await this.sendEmail(to, `Order #${orderNumber} Status: ${status}`, html);
+  }
 }

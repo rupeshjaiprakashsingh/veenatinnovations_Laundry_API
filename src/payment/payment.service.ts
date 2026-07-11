@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PaymentRepository, OrderRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreatePaymentDto } from './payment.dto';
+import { NotificationSenderService } from '../notification/notification-sender.service';
 
 @Injectable()
 export class PaymentService {
@@ -9,12 +10,13 @@ export class PaymentService {
     private readonly paymentRepository: PaymentRepository,
     private readonly orderRepository: OrderRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationSender: NotificationSenderService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto) {
     const { orderId, amount, paymentMode, transactionReference } = createPaymentDto;
 
-    const order = await this.orderRepository.findById(orderId);
+    const order = await this.orderRepository.findDetailed(orderId);
     if (!order) throw new NotFoundException(`Order with ID ${orderId} not found`);
 
     return this.prisma.$transaction(async (tx) => {
@@ -47,6 +49,20 @@ export class PaymentService {
         where: { id: orderId },
         data: { paymentStatus },
       });
+
+      // Send payment receipt email
+      if (order.customer?.email) {
+        this.notificationSender.sendPaymentReceivedEmail(
+          order.customer.email,
+          order.customer.firstName,
+          order.orderNumber,
+          amount,
+          paymentMode,
+          transactionReference
+        ).catch(err => {
+          console.error('Payment receipt email failed:', err);
+        });
+      }
 
       return payment;
     });

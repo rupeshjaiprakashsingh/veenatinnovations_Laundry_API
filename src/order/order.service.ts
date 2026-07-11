@@ -513,6 +513,18 @@ export class OrderService implements OnModuleInit {
       },
     });
 
+    // Send order status update email
+    if (order.customer?.email) {
+      this.notificationSender.sendOrderStatusUpdateEmail(
+        order.customer.email,
+        order.customer.firstName,
+        order.orderNumber,
+        dto.orderStatus
+      ).catch(err => {
+        console.error('Order status update email failed:', err);
+      });
+    }
+
     return this.enrichOrderWithBillingDetails(updated);
   }
 

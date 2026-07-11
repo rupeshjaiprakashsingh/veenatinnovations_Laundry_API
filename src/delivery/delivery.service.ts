@@ -84,6 +84,18 @@ export class DeliveryService {
           },
         });
 
+        // Send Pickup Scheduled email
+        if (order.customer?.email) {
+          this.notificationSender.sendOrderStatusUpdateEmail(
+            order.customer.email,
+            order.customer.firstName,
+            order.orderNumber,
+            'Pickup Scheduled'
+          ).catch(err => {
+            console.error('Pickup Scheduled status email failed:', err);
+          });
+        }
+
         // Automatically pre-create/update the Delivery record so the delivery boy is assigned for both pickup and delivery phase
         const existingDelivery = await tx.delivery.findFirst({
           where: { orderId: dto.orderId },
@@ -155,6 +167,18 @@ export class DeliveryService {
         },
       });
 
+      // Send Out For Delivery email
+      if (order.customer?.email) {
+        this.notificationSender.sendOrderStatusUpdateEmail(
+          order.customer.email,
+          order.customer.firstName,
+          order.orderNumber,
+          'Out For Delivery'
+        ).catch(err => {
+          console.error('Out For Delivery status email failed:', err);
+        });
+      }
+
       return delivery;
     });
   }
@@ -225,12 +249,25 @@ export class DeliveryService {
         });
 
       } else if (dto.deliveryStatus === 'Failed') {
-        await tx.order.update({
+        const order = await tx.order.update({
           where: { id: delivery.orderId },
           data: {
             orderStatus: 'Laundry', // Fallback to laundry
           },
+          include: { customer: true },
         });
+
+        // Send laundry fallback email
+        if (order.customer?.email) {
+          this.notificationSender.sendOrderStatusUpdateEmail(
+            order.customer.email,
+            order.customer.firstName,
+            order.orderNumber,
+            'Laundry'
+          ).catch(err => {
+            console.error('Laundry fallback status email failed:', err);
+          });
+        }
       }
 
       return updatedDelivery;

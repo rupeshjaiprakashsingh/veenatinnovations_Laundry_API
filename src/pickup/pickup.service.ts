@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PickupRequestRepository, EmployeeRepository, CustomerRepository } from '../common/repositories/laundry.repositories';
 import { CreatePickupRequestDto, AssignPickupDto, UpdatePickupStatusDto } from './pickup.dto';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationSenderService } from '../notification/notification-sender.service';
 
 @Injectable()
 export class PickupService {
@@ -10,6 +11,7 @@ export class PickupService {
     private readonly employeeRepository: EmployeeRepository,
     private readonly customerRepository: CustomerRepository,
     private readonly prisma: PrismaService,
+    private readonly notificationSender: NotificationSenderService,
   ) {}
 
   async create(dto: CreatePickupRequestDto) {
@@ -73,12 +75,13 @@ export class PickupService {
 
         if (activeOrder) {
           // Update order status to Picked Up
-          await tx.order.update({
+          const updatedOrder = await tx.order.update({
             where: { id: activeOrder.id },
             data: {
               orderStatus: 'Picked Up',
               laundryShopId: dto.laundryShopId || undefined,
             },
+            include: { customer: true },
           });
 
           // Create status history entry
@@ -88,6 +91,18 @@ export class PickupService {
               status: 'Picked Up',
             },
           });
+
+          // Send Picked Up notification email
+          if (updatedOrder.customer?.email) {
+            this.notificationSender.sendOrderStatusUpdateEmail(
+              updatedOrder.customer.email,
+              updatedOrder.customer.firstName,
+              updatedOrder.orderNumber,
+              'Picked Up'
+            ).catch(err => {
+              console.error('Picked Up status email failed:', err);
+            });
+          }
         }
       }
 

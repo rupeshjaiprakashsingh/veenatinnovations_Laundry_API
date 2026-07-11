@@ -1,5 +1,5 @@
 async function populateProduction() {
-  const baseURL = 'https://veenatinnovations-laundry-api.onrender.com/api/v1';
+  const baseURL = 'http://localhost:5000/api/v1';
   try {
     console.log('Logging in as Admin...');
     const loginRes = await fetch(`${baseURL}/auth/login`, {

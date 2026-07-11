@@ -105,6 +105,14 @@ export class ServiceController {
     return this.serviceService.getPricing(pincode);
   }
 
+  // --- PUBLIC: CHECK PINCODE SERVICEABILITY ---
+  @Public()
+  @Get('check-serviceability')
+  @ApiOperation({ summary: 'Check if a pincode is within the serviceable area' })
+  checkServiceability(@Query('pincode') pincode: string) {
+    return this.serviceService.checkServiceability(pincode);
+  }
+
   // --- CORE SERVICE CRUD ---
   @Post()
   @ApiBearerAuth()

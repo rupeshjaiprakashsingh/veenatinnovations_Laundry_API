@@ -71,4 +71,9 @@ export class UpdateCustomerDto {
   @IsString()
   @IsOptional()
   referralCode?: string;
+
+  @ApiProperty({ example: 'CUST-1001', required: false })
+  @IsString()
+  @IsOptional()
+  customerCode?: string;
 }

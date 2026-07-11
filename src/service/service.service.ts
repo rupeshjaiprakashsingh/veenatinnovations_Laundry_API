@@ -174,4 +174,23 @@ export class ServiceService {
       where: { id }
     });
   }
+
+  async checkServiceability(pincode: string): Promise<{ serviceable: boolean }> {
+    const cleanPincode = pincode ? pincode.trim() : '';
+    if (!cleanPincode) return { serviceable: false };
+
+    // 1. Check active laundry shops in this pincode
+    const activeShop = await this.prisma.laundryShop.findFirst({
+      where: { pincode: cleanPincode, isActive: true },
+    });
+    if (activeShop) return { serviceable: true };
+
+    // 2. Check active service prices for this pincode
+    const activePrice = await this.prisma.servicePrice.findFirst({
+      where: { pincode: cleanPincode, isActive: true },
+    });
+    if (activePrice) return { serviceable: true };
+
+    return { serviceable: false };
+  }
 }

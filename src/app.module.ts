@@ -19,6 +19,7 @@ import { ReportsModule } from './reports/reports.module';
 import { LaundryShopModule } from './laundry-shop/laundry-shop.module';
 import { CouponModule } from './coupon/coupon.module';
 import { AddressModule } from './address/address.module';
+import { BannerModule } from './banner/banner.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AddressModule } from './address/address.module';
     LaundryShopModule,
     CouponModule,
     AddressModule,
+    BannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

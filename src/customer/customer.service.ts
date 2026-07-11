@@ -74,7 +74,56 @@ export class CustomerService {
       }
     }
 
-    return this.customerRepository.update(id, updateCustomerDto);
+    if (updateCustomerDto.customerCode) {
+      const existing = await this.prisma.customer.findFirst({
+        where: {
+          customerCode: updateCustomerDto.customerCode,
+          NOT: { id },
+        },
+      });
+      if (existing) {
+        throw new BadRequestException('Customer with this customer code already registered');
+      }
+    }
+
+    const updated = await this.customerRepository.update(id, updateCustomerDto);
+
+    // Sync to default Address record as well
+    if (updateCustomerDto.address || updateCustomerDto.city || updateCustomerDto.state || updateCustomerDto.pincode || updateCustomerDto.landmark || updateCustomerDto.houseDetails) {
+      const defaultAddr = await this.prisma.address.findFirst({
+        where: { customerId: id, isDefault: true },
+      });
+
+      if (defaultAddr) {
+        await this.prisma.address.update({
+          where: { id: defaultAddr.id },
+          data: {
+            address: updateCustomerDto.address ?? defaultAddr.address,
+            city: updateCustomerDto.city ?? defaultAddr.city,
+            state: updateCustomerDto.state ?? defaultAddr.state,
+            pincode: updateCustomerDto.pincode ?? defaultAddr.pincode,
+            landmark: updateCustomerDto.landmark ?? defaultAddr.landmark,
+            houseDetails: updateCustomerDto.houseDetails ?? defaultAddr.houseDetails,
+          },
+        });
+      } else {
+        await this.prisma.address.create({
+          data: {
+            customerId: id,
+            title: 'Home Address',
+            address: updateCustomerDto.address || updated.address || '',
+            city: updateCustomerDto.city || updated.city || null,
+            state: updateCustomerDto.state || updated.state || null,
+            pincode: updateCustomerDto.pincode || updated.pincode || null,
+            landmark: updateCustomerDto.landmark || updated.landmark || null,
+            houseDetails: updateCustomerDto.houseDetails || updated.houseDetails || null,
+            isDefault: true,
+          },
+        });
+      }
+    }
+
+    return updated;
   }
 
   async remove(id: number) {

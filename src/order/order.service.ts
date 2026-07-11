@@ -128,8 +128,11 @@ export class OrderService implements OnModuleInit {
     const taxAmount = parseFloat((subtotal * gstRate).toFixed(2));
 
     const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
-    const freeDeliverySaving = totalQuantity >= 10 ? 20.0 : 0.0;
+    const orderCount = await this.prisma.order.count({ where: { customerId } });
+    const isFirstOrder = orderCount === 0;
+
+    const deliveryCharge = isFirstOrder ? 0.0 : 20.0;
+    const freeDeliverySaving = isFirstOrder ? 20.0 : 0.0;
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
@@ -141,8 +144,7 @@ export class OrderService implements OnModuleInit {
       }
     }
 
-    const orderCount = await this.prisma.order.count({ where: { customerId } });
-    const firstOrderDiscount = orderCount === 0 ? 20.0 : 0.0;
+    const firstOrderDiscount = (isFirstOrder && totalQuantity > 5) ? 50.0 : 0.0;
 
     let referralDiscount = 0.0;
     const pendingRefereeReferral = await this.prisma.referral.findUnique({
@@ -331,9 +333,11 @@ export class OrderService implements OnModuleInit {
         });
       }
 
-      const orderNotes = bill.couponCode 
-        ? (notes ? `${notes} | Coupon Code Applied: ${bill.couponCode}` : `Coupon Code Applied: ${bill.couponCode}`)
-        : notes;
+      const deliveryNote = bill.deliveryCharge === 0.0 ? 'Delivery: Free (First Order)' : 'Delivery: Paid';
+      let orderNotes = notes ? `${notes} | ${deliveryNote}` : deliveryNote;
+      if (bill.couponCode) {
+        orderNotes += ` | Coupon Code Applied: ${bill.couponCode}`;
+      }
 
       const order = await tx.order.create({
         data: {
@@ -414,8 +418,20 @@ export class OrderService implements OnModuleInit {
       ? order.orderItems.reduce((sum: number, item: any) => sum + item.quantity, 0)
       : 0;
     
-    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
-    const freeDeliverySaving = totalQuantity >= 10 ? 20.0 : 0.0;
+    let deliveryCharge = 20.0;
+    if (order.notes) {
+      if (order.notes.includes('Delivery: Free (First Order)')) {
+        deliveryCharge = 0.0;
+      } else if (order.notes.includes('Delivery: Paid')) {
+        deliveryCharge = 20.0;
+      } else {
+        // Fallback for legacy orders
+        deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
+      }
+    } else {
+      deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
+    }
+    const freeDeliverySaving = deliveryCharge === 0.0 ? 20.0 : 0.0;
 
     // Reconstruct insurance charge
     const reconstructedInsurance = netAmount - subtotal - taxAmount - platformFee - deliveryCharge + discountAmount;

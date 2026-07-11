@@ -100,9 +100,17 @@ export class AuthService {
     });
     if (mobileExists) throw new BadRequestException('Mobile number already registered');
 
-    // Auto-generate CustomerCode (e.g. CUST-xxxx)
+    // Verify manual CustomerCode uniqueness if provided, else auto-generate
+    if (dto.customerCode) {
+      const codeExists = await this.prisma.customer.findUnique({
+        where: { customerCode: dto.customerCode },
+      });
+      if (codeExists) {
+        throw new BadRequestException('Customer code already registered');
+      }
+    }
     const count = await this.prisma.customer.count();
-    const customerCode = `CUST-${String(count + 1).padStart(4, '0')}`;
+    const customerCode = dto.customerCode || `CUST-${String(count + 1).padStart(4, '0')}`;
 
     // Check if referralCode is valid if provided
     let referrerId: number | null = null;
@@ -144,6 +152,22 @@ export class AuthService {
         isActive: true,
       },
     });
+
+    if (dto.address) {
+      await this.prisma.address.create({
+        data: {
+          customerId: customer.id,
+          title: 'Home Address',
+          address: dto.address,
+          city: dto.city || null,
+          state: dto.state || null,
+          pincode: dto.pincode || null,
+          landmark: dto.landmark || null,
+          houseDetails: dto.houseDetails || null,
+          isDefault: true,
+        },
+      });
+    }
 
     if (referrerId) {
       await this.prisma.referral.create({

@@ -53,8 +53,12 @@ export class NotificationSenderService {
 
   async sendEmail(to: string, subject: string, html: string) {
     try {
+      const emailUser = (process.env.EMAIL_USER || '').trim();
+      const host = (this.transporter.options as any).host || (this.transporter.options as any).service || 'unknown';
+      console.log(`[EMAIL SENDING] Attempting to send email to ${to}. Subject: "${subject}". Host: ${host}. From: ${emailUser}`);
+
       const info = await this.transporter.sendMail({
-        from: `"Veena Innovations Laundry" <${process.env.EMAIL_USER || process.env.SMTP_FROM || 'no-reply@veenatinnovations.com'}>`,
+        from: `"Veena Innovations Laundry" <${emailUser || process.env.SMTP_FROM || 'no-reply@veenatinnovations.com'}>`,
         to,
         subject,
         html,
@@ -63,6 +67,7 @@ export class NotificationSenderService {
       return info;
     } catch (error) {
       console.error(`[EMAIL ERROR] Failed to send email to ${to}:`, error);
+      throw error;
     }
   }
 

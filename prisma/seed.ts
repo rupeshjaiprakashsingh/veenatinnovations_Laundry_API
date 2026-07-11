@@ -130,6 +130,47 @@ async function main() {
   });
   console.log('Delivery Boy ready');
 
+  // 6. Deduplicate deliveries (Clean up existing duplicates)
+  console.log('🧹 Deduplicating deliveries...');
+  const groups = await prisma.delivery.groupBy({
+    by: ['orderId'],
+    _count: {
+      id: true,
+    },
+    having: {
+      orderId: {
+        _count: {
+          gt: 1,
+        },
+      },
+    },
+  });
+
+  console.log(`Found ${groups.length} order(s) with duplicate deliveries.`);
+
+  let totalDeleted = 0;
+  for (const group of groups) {
+    const orderId = group.orderId;
+    const deliveries = await prisma.delivery.findMany({
+      where: { orderId },
+      orderBy: { id: 'asc' },
+    });
+    const toKeep = deliveries[deliveries.length - 1];
+    const toDeleteIds = deliveries
+      .slice(0, -1)
+      .map(d => d.id);
+
+    const deleted = await prisma.delivery.deleteMany({
+      where: {
+        id: {
+          in: toDeleteIds,
+        },
+      },
+    });
+    totalDeleted += deleted.count;
+  }
+  console.log(`Deleted ${totalDeleted} duplicate delivery records.`);
+
   // NOTE: Services, Products, and Prices are NOT seeded here.
   // Add them from the Admin Panel → Services & Pricing pages.
   console.log('\n✅ Seed complete. No dummy services seeded.');

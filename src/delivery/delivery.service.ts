@@ -114,15 +114,32 @@ export class DeliveryService {
       }
 
       // 2. Otherwise (Ready For Delivery, Out For Delivery, etc.), it is a DELIVERY assignment
-      const delivery = await tx.delivery.create({
-        data: {
-          orderId: dto.orderId,
-          deliveryEmployeeId: dto.deliveryEmployeeId,
-          deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
-          deliveryStatus: 'Pending',
-          deliveryRemarks: dto.deliveryRemarks,
-        },
+      const existingDelivery = await tx.delivery.findFirst({
+        where: { orderId: dto.orderId },
       });
+
+      let delivery;
+      if (!existingDelivery) {
+        delivery = await tx.delivery.create({
+          data: {
+            orderId: dto.orderId,
+            deliveryEmployeeId: dto.deliveryEmployeeId,
+            deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
+            deliveryStatus: 'Pending',
+            deliveryRemarks: dto.deliveryRemarks,
+          },
+        });
+      } else {
+        delivery = await tx.delivery.update({
+          where: { id: existingDelivery.id },
+          data: {
+            deliveryEmployeeId: dto.deliveryEmployeeId,
+            deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
+            deliveryStatus: 'Pending',
+            deliveryRemarks: dto.deliveryRemarks ?? existingDelivery.deliveryRemarks,
+          },
+        });
+      }
 
       // Update order status to Out For Delivery since it is assigned and created
       await tx.order.update({

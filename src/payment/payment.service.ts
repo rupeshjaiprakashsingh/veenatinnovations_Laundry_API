@@ -16,7 +16,7 @@ export class PaymentService {
   async create(createPaymentDto: CreatePaymentDto) {
     const { orderId, amount, paymentMode, transactionReference } = createPaymentDto;
 
-    const order = await this.orderRepository.findDetailed(orderId);
+    const order: any = await this.orderRepository.findDetailed(orderId);
     if (!order) throw new NotFoundException(`Order with ID ${orderId} not found`);
 
     return this.prisma.$transaction(async (tx) => {

@@ -74,7 +74,7 @@ export class OrderController {
   }
 
   @Put(':id/assign-shop')
-  @Roles('SuperAdmin', 'BranchManager', 'Employee')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Assign a single order to a laundry shop' })
   assignToShop(@Param('id', ParseIntPipe) id: number, @Body() assignShopDto: AssignShopDto) {
     return this.orderService.assignToShop(id, assignShopDto);

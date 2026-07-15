@@ -311,7 +311,7 @@ export class DeliveryService {
   async findByEmployee(employeeId: number) {
     return this.deliveryRepository.findAll({
       where: { deliveryEmployeeId: employeeId },
-      include: { order: { include: { customer: true } } },
+      include: { order: { include: { customer: true, laundryShop: true } } },
       orderBy: { id: 'desc' },
     });
   }

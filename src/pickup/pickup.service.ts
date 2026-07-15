@@ -119,10 +119,36 @@ export class PickupService {
   }
 
   async findByEmployee(employeeId: number) {
-    return this.pickupRepository.findAll({
+    const pickups = await this.pickupRepository.findAll({
       where: { assignedEmployeeId: employeeId },
       include: { customer: true },
       orderBy: { pickupDate: 'desc' },
     });
+
+    const enrichedPickups = await Promise.all(
+      pickups.map(async (pickup) => {
+        const activeOrder = await this.prisma.order.findFirst({
+          where: {
+            customerId: pickup.customerId,
+            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up'] },
+          },
+          include: { laundryShop: true },
+          orderBy: { id: 'desc' },
+        });
+
+        return {
+          ...pickup,
+          order: activeOrder
+            ? {
+                id: activeOrder.id,
+                orderNumber: activeOrder.orderNumber,
+                laundryShop: activeOrder.laundryShop,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return enrichedPickups;
   }
 }

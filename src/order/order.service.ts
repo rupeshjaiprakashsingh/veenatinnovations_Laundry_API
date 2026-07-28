@@ -222,47 +222,47 @@ export class OrderService implements OnModuleInit {
     }
 
     // Resolve address fields for order snapshot
-    let addressTitle = createOrderDto.addressTitle;
-    let address = createOrderDto.address;
-    let city = createOrderDto.city;
-    let state = createOrderDto.state;
-    let pincode = createOrderDto.pincode;
-    let landmark = createOrderDto.landmark;
-    let houseDetails = createOrderDto.houseDetails;
+    let addressTitle = createOrderDto.addressTitle ?? null;
+    let address = createOrderDto.address ?? null;
+    let city = createOrderDto.city ?? null;
+    let state = createOrderDto.state ?? null;
+    let pincode = createOrderDto.pincode ?? null;
+    let landmark = createOrderDto.landmark ?? null;
+    let houseDetails = createOrderDto.houseDetails ?? null;
 
     if (addressId) {
       const addr = await this.prisma.address.findUnique({
         where: { id: addressId },
       });
       if (addr) {
-        addressTitle = addr.title;
-        address = addr.address;
-        city = addr.city ?? undefined;
-        state = addr.state ?? undefined;
-        pincode = addr.pincode ?? undefined;
-        landmark = addr.landmark ?? undefined;
-        houseDetails = addr.houseDetails ?? undefined;
+        addressTitle = addr.title ?? null;
+        address = addr.address ?? null;
+        city = addr.city ?? null;
+        state = addr.state ?? null;
+        pincode = addr.pincode ?? null;
+        landmark = addr.landmark ?? null;
+        houseDetails = addr.houseDetails ?? null;
       }
     } else if (!address) {
       const defaultAddr = await this.prisma.address.findFirst({
         where: { customerId, isDefault: true },
       });
       if (defaultAddr) {
-        addressTitle = defaultAddr.title;
-        address = defaultAddr.address;
-        city = defaultAddr.city ?? undefined;
-        state = defaultAddr.state ?? undefined;
-        pincode = defaultAddr.pincode ?? undefined;
-        landmark = defaultAddr.landmark ?? undefined;
-        houseDetails = defaultAddr.houseDetails ?? undefined;
+        addressTitle = defaultAddr.title ?? null;
+        address = defaultAddr.address ?? null;
+        city = defaultAddr.city ?? null;
+        state = defaultAddr.state ?? null;
+        pincode = defaultAddr.pincode ?? null;
+        landmark = defaultAddr.landmark ?? null;
+        houseDetails = defaultAddr.houseDetails ?? null;
       } else {
         addressTitle = 'Default';
-        address = customer.address ?? undefined;
-        city = customer.city ?? undefined;
-        state = customer.state ?? undefined;
-        pincode = customer.pincode ?? undefined;
-        landmark = customer.landmark ?? undefined;
-        houseDetails = customer.houseDetails ?? undefined;
+        address = customer.address ?? null;
+        city = customer.city ?? null;
+        state = customer.state ?? null;
+        pincode = customer.pincode ?? null;
+        landmark = customer.landmark ?? null;
+        houseDetails = customer.houseDetails ?? null;
       }
     }
 
@@ -353,13 +353,13 @@ export class OrderService implements OnModuleInit {
           taxAmount: bill.taxAmount,
           netAmount: bill.finalPayable,
           notes: orderNotes,
-          addressTitle,
-          address,
-          city,
-          state,
-          pincode,
-          landmark,
-          houseDetails,
+          addressTitle: addressTitle ?? null,
+          address: address ?? null,
+          city: city ?? null,
+          state: state ?? null,
+          pincode: pincode ?? null,
+          landmark: landmark ?? null,
+          houseDetails: houseDetails ?? null,
           orderItems: {
             create: itemsToCreate,
           },
@@ -399,7 +399,7 @@ export class OrderService implements OnModuleInit {
         console.error('Order created confirmation email failed:', err);
       });
 
-      return order;
+      return this.enrichOrderWithBillingDetails(order);
     });
   }
 

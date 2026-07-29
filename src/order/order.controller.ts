@@ -34,6 +34,14 @@ export class OrderController {
     return this.orderService.calculateOrderBillDetails(createOrderDto);
   }
 
+  @Post('sync-sequences')
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Synchronize PostgreSQL primary key sequences (SuperAdmin only)' })
+  async syncSequences() {
+    await this.orderService.syncSequences();
+    return { success: true, message: 'Database sequences reset and synced successfully.' };
+  }
+
   @Get()
   @Roles('SuperAdmin', 'BranchManager', 'Employee')
   @ApiOperation({ summary: 'Get all orders (Staff only)' })

@@ -36,6 +36,10 @@ export class OrderService implements OnModuleInit {
     }
   }
 
+  async syncSequences() {
+    return this.prisma.syncDatabaseSequences();
+  }
+
   async resolveServicePrice(serviceId: number, clothType: string, customerId: number, selectedPincode?: string): Promise<number> {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     const pincode = selectedPincode || customer?.pincode?.trim() || 'DEFAULT';
@@ -298,9 +302,17 @@ export class OrderService implements OnModuleInit {
       }
     }
 
-    // Generate OrderNumber
-    const count = await this.prisma.order.count();
-    const orderNumber = `ORD-${String(count + 1).padStart(5, '0')}`;
+    // Generate OrderNumber safely
+    const maxOrder = await this.prisma.order.findFirst({
+      orderBy: { id: 'desc' },
+      select: { id: true }
+    });
+    let seq = (maxOrder?.id || 0) + 1;
+    let orderNumber = `ORD-${String(seq).padStart(5, '0')}`;
+    while (await this.prisma.order.findUnique({ where: { orderNumber } })) {
+      seq++;
+      orderNumber = `ORD-${String(seq).padStart(5, '0')}`;
+    }
 
     // Create Order + OrderItems in a transaction
     return this.prisma.$transaction(async (tx) => {
@@ -344,8 +356,8 @@ export class OrderService implements OnModuleInit {
           orderNumber,
           customerId,
           branchId,
-          pickupDate: pickupDate ? new Date(pickupDate) : null,
-          deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+          pickupDate: pickupDate && !isNaN(Date.parse(pickupDate)) ? new Date(pickupDate) : null,
+          deliveryDate: deliveryDate && !isNaN(Date.parse(deliveryDate)) ? new Date(deliveryDate) : null,
           orderStatus: 'New Order',
           paymentStatus: 'Pending',
           totalAmount: bill.subtotal,

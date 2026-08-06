@@ -1,5 +1,5 @@
 async function checkProduction() {
-  const baseURL = 'https://veenatinnovations-laundry-api.onrender.com/api/v1';
+  const baseURL = 'https://starfish-app-sy95b.ondigitalocean.app/api/v1';
   try {
     console.log('Logging in as Admin...');
     const loginRes = await fetch(`${baseURL}/auth/login`, {

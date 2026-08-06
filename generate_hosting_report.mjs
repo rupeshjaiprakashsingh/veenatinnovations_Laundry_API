@@ -670,7 +670,7 @@ function makeDeploymentGuide() {
     bullet("Navigate to Apps → Create App"),
     bullet("Select 'GitHub' as source"),
     bullet("Authorize DigitalOcean to access your GitHub"),
-    bullet("Select repository: veenatinnovations_Laundry_API"),
+    bullet("Select the laundry API repository"),
     bullet("Select branch: main (or your production branch)"),
     ...spacer(1),
     subHeading("Step 3 — Configure API Service"),
@@ -816,7 +816,7 @@ function makeFinalRecommendation() {
     ...spacer(1),
     new Paragraph({
       children: [
-        new TextRun({ text: "Prepared by DevOps Engineering Team  |  Veenat Innovations  |  July 2026  |  Confidential", color: COLORS.midGray, size: 16, font: "Calibri", italics: true }),
+        new TextRun({ text: "Prepared by DevOps Engineering Team  |  Saimorphix Innovations  |  July 2026  |  Confidential", color: COLORS.midGray, size: 16, font: "Calibri", italics: true }),
       ],
       alignment: AlignmentType.CENTER,
       spacing: { before: 200 },
@@ -829,7 +829,7 @@ function makeFinalRecommendation() {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function buildDoc() {
   const doc = new Document({
-    creator: "DevOps Engineering Team — Veenat Innovations",
+    creator: "DevOps Engineering Team — Saimorphix Innovations",
     title: "Laundry App Cloud Hosting Vendor Comparison Report",
     description: "Comprehensive comparison of DigitalOcean, Railway, and Render for Indian market deployment",
     styles: {
@@ -853,7 +853,7 @@ async function buildDoc() {
               new Paragraph({
                 children: [
                   new TextRun({ text: "Laundry App — Cloud Hosting Vendor Comparison Report", color: COLORS.primary, size: 18, font: "Calibri", bold: true }),
-                  new TextRun({ text: "  |  Veenat Innovations  |  CONFIDENTIAL", color: COLORS.midGray, size: 16, font: "Calibri" }),
+                  new TextRun({ text: "  |  Saimorphix Innovations  |  CONFIDENTIAL", color: COLORS.midGray, size: 16, font: "Calibri" }),
                 ],
                 border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: COLORS.accent } },
               }),
@@ -864,7 +864,7 @@ async function buildDoc() {
           default: new Footer({
             children: [
               new Paragraph({
-                children: [new TextRun({ text: "© 2026 Veenat Innovations — DevOps Engineering Team  |  Page ", color: COLORS.midGray, size: 16, font: "Calibri" })],
+                children: [new TextRun({ text: "© 2026 Saimorphix Innovations — DevOps Engineering Team  |  Page ", color: COLORS.midGray, size: 16, font: "Calibri" })],
                 alignment: AlignmentType.CENTER,
                 border: { top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.midGray } },
               }),

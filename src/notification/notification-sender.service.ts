@@ -42,7 +42,7 @@ export class NotificationSenderService {
   async sendEmail(to: string, subject: string, html: string) {
     const brevoKey = (process.env.BREVO_API_KEY || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
-    const fromName = 'Veena Innovations Laundry';
+    const fromName = 'Saimorphix Innovations Laundry';
     const fromEmail = emailUser || 'no-reply@veenatinnovations.com';
 
     // --- Brevo HTTP API (Render-compatible) ---
@@ -108,7 +108,7 @@ export class NotificationSenderService {
   async sendRegistrationEmail(to: string, name: string) {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4F46E5; text-align: center;">Welcome to Veena Innovations Laundry!</h2>
+        <h2 style="color: #4F46E5; text-align: center;">Welcome to Saimorphix Innovations Laundry!</h2>
         <p>Dear ${name},</p>
         <p>Thank you for registering with us. We are excited to provide you with the best laundry and pickup services in India!</p>
         <p>You can now book laundry, dry cleaning, and ironing services right from your doorstep.</p>
@@ -117,10 +117,10 @@ export class NotificationSenderService {
           <a href="#" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your First Order</a>
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #888; text-align: center;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
-    await this.sendEmail(to, 'Welcome to Veena Innovations Laundry!', html);
+    await this.sendEmail(to, 'Welcome to Saimorphix Innovations Laundry!', html);
   }
 
   async sendOrderCreatedEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
@@ -154,7 +154,7 @@ export class NotificationSenderService {
         <p style="font-size: 16px; font-weight: bold; text-align: right; color: #4F46E5;">Total Amount: ₹${amount}</p>
         
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #888; text-align: center;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Order #${orderNumber} Confirmed!`, html);
@@ -173,7 +173,7 @@ export class NotificationSenderService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
         <h2 style="color: #10B981; text-align: center;">Delivery Complete & Invoice</h2>
         <p>Dear ${name},</p>
-        <p>Thank you for choosing Veena Innovations Laundry. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
+        <p>Thank you for choosing Saimorphix Innovations Laundry. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
         <p>Here is your invoice summary:</p>
         
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -193,7 +193,7 @@ export class NotificationSenderService {
         <p style="text-align: center; color: #10B981; font-weight: bold; font-size: 18px; margin: 20px 0;">Payment Status: PAID</p>
         
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #888; text-align: center;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Invoice for Order #${orderNumber}`, html);
@@ -211,11 +211,11 @@ export class NotificationSenderService {
         </div>
         <p style="color: #991B1B; font-weight: bold;">Important: Do not share this OTP with anyone other than the assigned delivery boy.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #888; text-align: center;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(toEmail, 'Delivery OTP Verification', html);
-    await this.sendSMS(toMobile, `Veena Innovations Laundry: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
+    await this.sendSMS(toMobile, `Saimorphix Innovations Laundry: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
   }
 
   async sendPaymentReceivedEmail(to: string, name: string, orderNumber: string, amount: number, paymentMode: string, transactionReference?: string) {
@@ -252,7 +252,7 @@ export class NotificationSenderService {
         <p style="color: #334155; font-size: 14px; line-height: 1.5;">If you have any questions regarding this transaction, please reply to this email or contact our customer support.</p>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Payment Confirmation: Order #${orderNumber}`, html);
@@ -300,7 +300,7 @@ export class NotificationSenderService {
         icon = '🛵';
         break;
       case 'Delivered':
-        statusDescription = 'Your order has been successfully delivered! Thank you for choosing Veena Innovations Laundry.';
+        statusDescription = 'Your order has been successfully delivered! Thank you for choosing Saimorphix Innovations Laundry.';
         statusColor = '#10B981'; // green
         icon = '🎉';
         break;
@@ -330,7 +330,7 @@ export class NotificationSenderService {
         <p style="color: #334155; font-size: 14px; line-height: 1.5;">You can track the progress of your order live inside our Grivana app.</p>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Veena Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Order #${orderNumber} Status: ${status}`, html);

@@ -114,6 +114,11 @@ export class NotificationSenderService {
         <p>You can now book laundry, dry cleaning, and ironing services right from your doorstep.</p>
         <br />
         <p style="text-align: center;">
+        <p>Dear ${name},</p>
+        <p>Thank you for registering with us. We are excited to provide you with the best laundry and pickup services in India!</p>
+        <p>You can now book laundry, dry cleaning, and ironing services right from your doorstep.</p>
+        <br />
+        <p style="text-align: center;">
           <a href="#" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your First Order</a>
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
@@ -121,48 +126,6 @@ export class NotificationSenderService {
       </div>
     `;
     await this.sendEmail(to, 'Welcome to Saimorphix Innovations Laundry!', html);
-  }
-
-  async sendOrderCreatedEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
-    const itemsHtml = items.map(item => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.clothType}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.service?.serviceName || 'Service'}</td>
-      </tr>
-    `).join('');
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4F46E5; text-align: center;">Order Confirmed!</h2>
-        <p>Dear ${name},</p>
-        <p>Your laundry order <strong>#${orderNumber}</strong> has been successfully received and scheduled for pickup.</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <thead>
-            <tr style="background-color: #f8f9fa;">
-              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Cloth Type</th>
-              <th style="padding: 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Quantity</th>
-              <th style="padding: 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Service</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-        
-        <p style="font-size: 16px; font-weight: bold; text-align: right; color: #4F46E5;">Total Amount: ₹${amount}</p>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">© Saimorphix Innovations Laundry. All rights reserved.</p>
-      </div>
-    `;
-    await this.sendEmail(to, `Order #${orderNumber} Confirmed!`, html);
-  }
-
-  async sendInvoiceEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
-    const itemsHtml = items.map(item => `
-      <tr>
         <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.clothType}</td>
         <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
         <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.service?.serviceName || 'Service'}</td>
@@ -260,79 +223,119 @@ export class NotificationSenderService {
 
   async sendOrderStatusUpdateEmail(to: string, name: string, orderNumber: string, status: string) {
     let statusDescription = `Your order status has been updated to ${status}.`;
-    let statusColor = '#4F46E5'; // indigo
+    let nextStepNote = 'You can track the progress of your order live inside our Grivana app.';
+    let statusColor = '#4F46E5';
+    let bgColor = '#EEF2FF';
     let icon = '🔄';
 
     switch (status) {
+      case 'New Order':
+        statusDescription = 'Your laundry order has been received and is being reviewed by our team.';
+        nextStepNote = 'Our team will assign a pickup agent shortly. Watch out for the next email!';
+        statusColor = '#4F46E5';
+        bgColor = '#EEF2FF';
+        icon = '✅';
+        break;
       case 'Pickup Scheduled':
-        statusDescription = 'A delivery agent has been assigned and is on the way to pick up your clothes.';
-        statusColor = '#3B82F6'; // blue
+        statusDescription = 'A pickup agent has been assigned and is scheduled to collect your clothes. Please keep your laundry ready!';
+        nextStepNote = 'Our agent will arrive at your doorstep as per the scheduled time. You will receive another alert when clothes are picked up.';
+        statusColor = '#3B82F6';
+        bgColor = '#DBEAFE';
         icon = '🛵';
         break;
       case 'Picked Up':
-        statusDescription = 'Your clothes have been successfully picked up and are on the way to our laundry facility.';
-        statusColor = '#8B5CF6'; // purple
+        statusDescription = 'Your clothes have been successfully collected by our agent and are now on the way to our laundry facility.';
+        nextStepNote = 'Your garments are in safe hands! We will notify you as soon as the cleaning process begins.';
+        statusColor = '#8B5CF6';
+        bgColor = '#EDE9FE';
         icon = '👕';
         break;
       case 'Processing':
-        statusDescription = 'Your clothes are being sorted and prepared for laundry.';
-        statusColor = '#EAB308'; // yellow
-        icon = '🧼';
+        statusDescription = 'Your clothes have arrived at our facility and are being carefully sorted and inspected before laundering.';
+        nextStepNote = 'Our team is preparing your garments for the wash cycle. Next update: Washing!';
+        statusColor = '#EAB308';
+        bgColor = '#FEF9C3';
+        icon = '🔍';
         break;
       case 'Washing':
-        statusDescription = 'Your clothes are currently undergoing the washing process.';
-        statusColor = '#06B6D4'; // cyan
+        statusDescription = 'Your clothes are currently in the washing machine, being cleaned with premium detergents.';
+        nextStepNote = 'After washing, your clothes will be dried and ironed. Stay tuned!';
+        statusColor = '#06B6D4';
+        bgColor = '#CFFAFE';
         icon = '🌊';
         break;
+      case 'Dry Cleaning':
+        statusDescription = 'Your garments are undergoing professional dry cleaning using industry-grade solvents for a superior clean.';
+        nextStepNote = 'Dry cleaning is in progress. We will notify you once ironing/steam pressing begins.';
+        statusColor = '#0EA5E9';
+        bgColor = '#E0F2FE';
+        icon = '✨';
+        break;
       case 'Ironing':
-        statusDescription = 'Your clothes are being ironed and steam-pressed to perfection.';
-        statusColor = '#F97316'; // orange
+        statusDescription = 'Your clothes are being precision-ironed and steam-pressed to give them a fresh, crisp finish.';
+        nextStepNote = 'Almost there! Your garments will be packed and ready for delivery very soon.';
+        statusColor = '#F97316';
+        bgColor = '#FFEDD5';
         icon = '💨';
         break;
       case 'Ready For Delivery':
-        statusDescription = 'Good news! Your clean clothes are ready and packed for delivery.';
-        statusColor = '#10B981'; // green
+        statusDescription = 'Excellent news! Your clean, fresh laundry is packed and ready to be dispatched for delivery.';
+        nextStepNote = 'A delivery agent will pick up your order shortly. You will receive a delivery OTP via email and SMS.';
+        statusColor = '#10B981';
+        bgColor = '#D1FAE5';
         icon = '📦';
         break;
       case 'Out For Delivery':
-        statusDescription = 'Your clean clothes have been handed over to our delivery partner and are out for delivery.';
-        statusColor = '#06B6D4'; // cyan
+        statusDescription = 'Your fresh, clean clothes have been dispatched and are currently on their way to your doorstep!';
+        nextStepNote = 'Please be available to receive your order. A delivery OTP will be required to confirm receipt. Check your email/SMS!';
+        statusColor = '#06B6D4';
+        bgColor = '#CFFAFE';
         icon = '🛵';
         break;
       case 'Delivered':
-        statusDescription = 'Your order has been successfully delivered! Thank you for choosing Saimorphix Innovations Laundry.';
-        statusColor = '#10B981'; // green
+        statusDescription = 'Your order has been successfully delivered to your doorstep. We hope your clothes look and feel amazing!';
+        nextStepNote = 'Thank you for choosing Saimorphix Innovations Laundry. We look forward to serving you again!';
+        statusColor = '#10B981';
+        bgColor = '#D1FAE5';
         icon = '🎉';
         break;
       case 'Cancelled':
-        statusDescription = 'Your order has been cancelled.';
-        statusColor = '#EF4444'; // red
+        statusDescription = 'Your order has been cancelled as per your request or due to an unforeseen issue.';
+        nextStepNote = 'If you did not request this cancellation, please contact our support team immediately.';
+        statusColor = '#EF4444';
+        bgColor = '#FEE2E2';
         icon = '❌';
         break;
     }
 
+    const updatedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+
     const html = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-        <div style="text-align: center; margin-bottom: 25px;">
-          <span style="font-size: 40px; margin-bottom: 10px; display: inline-block;">${icon}</span>
-          <h2 style="color: ${statusColor}; margin: 0; font-size: 24px; font-weight: 700;">Order Status Update</h2>
-          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Order #${orderNumber}</p>
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        
+        <div style="text-align: center; margin-bottom: 25px; padding: 20px; background: ${bgColor}; border-radius: 10px;">
+          <span style="font-size: 44px; display: block; margin-bottom: 8px;">${icon}</span>
+          <h2 style="color: ${statusColor}; margin: 0; font-size: 22px; font-weight: 700;">Order Update: ${status}</h2>
+          <p style="color: #64748b; font-size: 14px; margin: 5px 0 0 0;">Order #${orderNumber}</p>
         </div>
         
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear ${name},</p>
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">The status of your laundry order <strong>#${orderNumber}</strong> has changed:</p>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Here is the latest update on your laundry order <strong style="color: ${statusColor};">#${orderNumber}</strong>:</p>
         
-        <div style="background-color: #f8fafc; border-left: 4px solid ${statusColor}; border-radius: 4px; padding: 15px 20px; margin: 20px 0;">
-          <h3 style="color: ${statusColor}; margin: 0 0 5px 0; font-size: 16px; font-weight: 700;">${status}</h3>
-          <p style="color: #475569; margin: 0; font-size: 14px; line-height: 1.5;">${statusDescription}</p>
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid ${statusColor}; border-radius: 8px; padding: 18px 20px; margin: 20px 0;">
+          <h3 style="color: ${statusColor}; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">${icon} ${status}</h3>
+          <p style="color: #334155; margin: 0; font-size: 14px; line-height: 1.6;">${statusDescription}</p>
+          <p style="color: #64748b; margin: 10px 0 0 0; font-size: 12px;">Updated at: ${updatedAt} IST</p>
         </div>
         
-        <p style="color: #334155; font-size: 14px; line-height: 1.5;">You can track the progress of your order live inside our Grivana app.</p>
+        <div style="background-color: #FFFBEB; border-left: 4px solid #F59E0B; border-radius: 4px; padding: 12px 16px; margin-bottom: 20px;">
+          <p style="margin: 0; font-size: 14px; color: #92400E;">💡 <strong>What's Next?</strong> ${nextStepNote}</p>
+        </div>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Saimorphix Innovations Laundry. All rights reserved.<br>You are receiving this email because you placed an order with us.</p>
       </div>
     `;
-    await this.sendEmail(to, `Order #${orderNumber} Status: ${status}`, html);
+    await this.sendEmail(to, `${icon} Order #${orderNumber} — Status: ${status}`, html);
   }
 }

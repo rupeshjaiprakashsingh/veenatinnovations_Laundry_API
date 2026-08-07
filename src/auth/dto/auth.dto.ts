@@ -90,6 +90,16 @@ export class RegisterCustomerDto {
   @IsString()
   @IsOptional()
   customerCode?: string;
+
+  @ApiProperty({ example: 19.076, required: false })
+  @IsNumber()
+  @IsOptional()
+  lat?: number;
+
+  @ApiProperty({ example: 72.877, required: false })
+  @IsNumber()
+  @IsOptional()
+  lng?: number;
 }
 
 export class RegisterEmployeeDto {

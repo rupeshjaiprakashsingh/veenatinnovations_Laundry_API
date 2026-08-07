@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEmail, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsEmail, IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateCustomerDto {
@@ -76,4 +76,14 @@ export class UpdateCustomerDto {
   @IsString()
   @IsOptional()
   customerCode?: string;
+
+  @ApiProperty({ example: 19.076, required: false })
+  @IsNumber()
+  @IsOptional()
+  lat?: number;
+
+  @ApiProperty({ example: 72.877, required: false })
+  @IsNumber()
+  @IsOptional()
+  lng?: number;
 }

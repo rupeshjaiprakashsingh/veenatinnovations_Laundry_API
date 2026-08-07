@@ -146,6 +146,8 @@ export class AuthService {
         pincode: dto.pincode,
         landmark: dto.landmark,
         houseDetails: dto.houseDetails,
+        lat: dto.lat,
+        lng: dto.lng,
         gender: dto.gender,
         dob: dto.dob,
         referralCode: dto.referralCode,
@@ -164,6 +166,8 @@ export class AuthService {
           pincode: dto.pincode || null,
           landmark: dto.landmark || null,
           houseDetails: dto.houseDetails || null,
+          lat: dto.lat || null,
+          lng: dto.lng || null,
           isDefault: true,
         },
       });

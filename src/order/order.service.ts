@@ -148,7 +148,14 @@ export class OrderService implements OnModuleInit {
       }
     }
 
-    const firstOrderDiscount = (isFirstOrder && totalQuantity > 5) ? 50.0 : 0.0;
+    let firstOrderDiscount = 0.0;
+    if (isFirstOrder) {
+      if (totalQuantity > 10) {
+        firstOrderDiscount = 100.0;
+      } else if (totalQuantity > 5) {
+        firstOrderDiscount = 50.0;
+      }
+    }
 
     let referralDiscount = 0.0;
     const pendingRefereeReferral = await this.prisma.referral.findUnique({

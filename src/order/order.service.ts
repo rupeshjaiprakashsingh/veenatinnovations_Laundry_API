@@ -548,8 +548,28 @@ export class OrderService implements OnModuleInit {
   }
 
   async updatePaymentStatus(id: number, dto: UpdatePaymentStatusDto) {
-    await this.findOne(id);
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { customer: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order #${id} not found`);
+    }
+
     const updated = await this.orderRepository.update(id, { paymentStatus: dto.paymentStatus });
+
+    if (dto.paymentStatus === 'PAID' && order.customer?.email) {
+      this.notificationSender.sendPaymentReceivedEmail(
+        order.customer.email,
+        order.customer.firstName,
+        order.orderNumber,
+        order.netAmount,
+        'Online Payment'
+      ).catch(err => {
+        console.error('Payment confirmation email failed:', err);
+      });
+    }
+
     return this.enrichOrderWithBillingDetails(updated);
   }
 

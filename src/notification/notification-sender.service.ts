@@ -6,38 +6,65 @@ export class NotificationSenderService {
   private transporter: nodemailer.Transporter | null = null;
 
   constructor() {
+    this.getTransporter();
+  }
+
+  private getTransporter(): nodemailer.Transporter | null {
+    if (this.transporter) return this.transporter;
+
     const emailService = (process.env.EMAIL_SERVICE || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const emailPass = (process.env.EMAIL_PASS || '').trim();
     const brevoKey = (process.env.BREVO_API_KEY || '').trim();
 
     if (brevoKey) {
-      console.log('[EMAIL SETUP] Using Brevo HTTP API for email sending (Render-compatible)');
-    } else if (emailService && emailUser && emailPass) {
-      console.log('[EMAIL SETUP] No BREVO_API_KEY found. Falling back to SMTP (local dev only)');
+      console.log('[EMAIL SETUP] Brevo HTTP API is configured.');
+      return null;
+    }
+
+    if (emailUser && emailPass) {
+      console.log('[EMAIL SETUP] Initializing Nodemailer SMTP transporter');
+      const host = (process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+      const port = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '587', 10);
+      const secure = port === 465;
+
       const transportOptions: any = {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
+        host,
+        port,
+        secure,
         family: 4,
         auth: { user: emailUser, pass: emailPass },
         tls: { rejectUnauthorized: false },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
       };
-      this.transporter = nodemailer.createTransport(transportOptions as any);
-    } else {
-      console.warn('[EMAIL SETUP] No email credentials found. Emails will be logged but not sent.');
+
+      if (emailService) {
+        transportOptions.service = emailService;
+      }
+
+      this.transporter = nodemailer.createTransport(transportOptions);
+      return this.transporter;
     }
+
+    console.warn('[EMAIL SETUP] No email credentials found in environment variables.');
+    return null;
   }
 
+  /**
+   * Send Email with Gmail anti-spam best practices:
+   * - Zero external links (no <a href="..."> tags)
+   * - Zero attachments
+   * - Clean, responsive inline HTML
+   */
   async sendEmail(to: string, subject: string, html: string) {
     const brevoKey = (process.env.BREVO_API_KEY || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const fromName = 'Saimorphix Innovations Laundry';
     const fromEmail = emailUser || 'no-reply@veenatinnovations.com';
 
+    // 1. Brevo HTTP API (Primary when BREVO_API_KEY is set)
     if (brevoKey) {
       console.log(`[EMAIL SENDING] Brevo API -> to=${to} subject="${subject}"`);
       try {
@@ -66,14 +93,15 @@ export class NotificationSenderService {
         return { messageId: `brevo-${Date.now()}`, response: responseText };
       } catch (err: any) {
         console.error(`[EMAIL FATAL] Brevo API failed:`, err?.message || err);
-        throw err;
       }
     }
 
-    if (this.transporter) {
+    // 2. SMTP Transporter Fallback
+    const transporter = this.getTransporter();
+    if (transporter) {
       console.log(`[EMAIL SENDING] SMTP fallback -> to=${to} subject="${subject}"`);
       try {
-        const info = await this.transporter.sendMail({
+        const info = await transporter.sendMail({
           from: `"${fromName}" <${fromEmail}>`,
           to,
           subject,
@@ -97,17 +125,22 @@ export class NotificationSenderService {
 
   async sendRegistrationEmail(to: string, name: string) {
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4F46E5; text-align: center;">Welcome to Saimorphix Innovations Laundry!</h2>
-        <p>Dear ${name},</p>
-        <p>Thank you for registering with us. We are excited to provide you with the best laundry and pickup services in India!</p>
-        <p>You can now book laundry, dry cleaning, and ironing services right from your doorstep.</p>
-        <br />
-        <p style="text-align: center;">
-          <a href="#" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your First Order</a>
-        </p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #4F46E5; margin: 0; font-size: 22px;">Welcome to Saimorphix Innovations Laundry</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for registering with us. We are excited to provide you with premium laundry, dry cleaning, and ironing services delivered right to your doorstep!</p>
+        <div style="background-color: #F8FAFC; border-left: 4px solid #4F46E5; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0; color: #1E293B; font-weight: 600; font-size: 14px;">Your Account Features:</p>
+          <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #475569; font-size: 13px; line-height: 1.6;">
+            <li>Doorstep laundry pickup and delivery</li>
+            <li>Real-time order tracking via Grivana app</li>
+            <li>First-order discounts &amp; free delivery offers</li>
+          </ul>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, 'Welcome to Saimorphix Innovations Laundry!', html);
@@ -116,33 +149,39 @@ export class NotificationSenderService {
   async sendOrderCreatedEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
     const itemsHtml = (items || []).map(item => `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.clothType || ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity || 1}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.service?.serviceName || 'Service'}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; color: #334155;">${item.clothType || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #334155;">${item.quantity || 1}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #334155;">${item.service?.serviceName || 'Service'}</td>
       </tr>
     `).join('');
 
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4F46E5; text-align: center;">Order Confirmed! #${orderNumber}</h2>
-        <p>Dear ${name},</p>
-        <p>Thank you for your order. We have received your laundry pickup request and our team is preparing for pickup.</p>
-        <p>Order Summary:</p>
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <thead>
-            <tr style="background-color: #f8f9fa;">
-              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Cloth Type</th>
-              <th style="padding: 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Quantity</th>
-              <th style="padding: 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Service</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-        <p style="font-size: 16px; font-weight: bold; text-align: right; color: #4F46E5;">Total Amount: INR ${amount}</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #4F46E5; margin: 0; font-size: 22px;">Order Confirmed! #${orderNumber}</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for your order. We have received your laundry pickup request and our team is preparing for pickup.</p>
+        
+        <div style="background-color: #F8FAFC; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <h3 style="color: #1E293B; margin-top: 0; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Order Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #F1F5F9;">
+                <th style="padding: 8px; text-align: left; color: #475569;">Cloth Type</th>
+                <th style="padding: 8px; text-align: center; color: #475569;">Quantity</th>
+                <th style="padding: 8px; text-align: right; color: #475569;">Service</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          <p style="font-size: 15px; font-weight: bold; text-align: right; color: #4F46E5; margin-top: 15px; margin-bottom: 0;">Total Payable: INR ${amount}</p>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Order Confirmation #${orderNumber}`, html);
@@ -151,37 +190,40 @@ export class NotificationSenderService {
   async sendDeliveryInvoiceEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
     const itemsHtml = (items || []).map(item => `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.clothType || ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity || 1}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${item.service?.serviceName || 'Service'}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; color: #334155;">${item.clothType || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #334155;">${item.quantity || 1}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #334155;">${item.service?.serviceName || 'Service'}</td>
       </tr>
     `).join('');
 
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #10B981; text-align: center;">Delivery Complete & Invoice</h2>
-        <p>Dear ${name},</p>
-        <p>Thank you for choosing Saimorphix Innovations Laundry. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
-        <p>Here is your invoice summary:</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <thead>
-            <tr style="background-color: #f8f9fa;">
-              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #dee2e6;">Cloth Type</th>
-              <th style="padding: 8px; text-align: center; border-bottom: 2px solid #dee2e6;">Quantity</th>
-              <th style="padding: 8px; text-align: right; border-bottom: 2px solid #dee2e6;">Service</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-        
-        <p style="font-size: 16px; font-weight: bold; text-align: right; color: #10B981;">Total Paid Amount: INR ${amount}</p>
-        <p style="text-align: center; color: #10B981; font-weight: bold; font-size: 18px; margin: 20px 0;">Payment Status: PAID</p>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #D1FAE5; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #10B981; margin: 0; font-size: 22px;">Delivery Complete &amp; Invoice</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for choosing Saimorphix Innovations Laundry. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
+
+        <div style="background-color: #F8FAFC; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <h3 style="color: #1E293B; margin-top: 0; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Invoice Details</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #F1F5F9;">
+                <th style="padding: 8px; text-align: left; color: #475569;">Cloth Type</th>
+                <th style="padding: 8px; text-align: center; color: #475569;">Quantity</th>
+                <th style="padding: 8px; text-align: right; color: #475569;">Service</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          <p style="font-size: 16px; font-weight: bold; text-align: right; color: #10B981; margin-top: 15px; margin-bottom: 0;">Total Paid: INR ${amount}</p>
+          <p style="text-align: center; color: #10B981; font-weight: bold; font-size: 16px; margin: 15px 0 0 0;">Payment Status: PAID</p>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Invoice for Order #${orderNumber}`, html);
@@ -193,17 +235,22 @@ export class NotificationSenderService {
 
   async sendDeliveryOtp(toEmail: string, toMobile: string, name: string, orderNumber: string, otp: string) {
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #F59E0B; text-align: center;">Delivery OTP Verification</h2>
-        <p>Dear ${name},</p>
-        <p>The delivery boy is at your doorstep to deliver order <strong>#${orderNumber}</strong>.</p>
-        <p>Please share the following OTP with the delivery boy to confirm successful receipt of your clothes:</p>
-        <div style="background-color: #FFFBEB; border: 1px solid #FCD34D; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 6px; letter-spacing: 4px; margin: 20px 0;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #FEF3C7; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #D97706; margin: 0; font-size: 22px;">Delivery OTP Verification</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">The delivery agent is at your doorstep to deliver order <strong>#${orderNumber}</strong>.</p>
+        <p style="color: #475569; font-size: 14px;">Please share the following OTP with the delivery agent to confirm delivery:</p>
+        
+        <div style="background-color: #FFFBEB; border: 2px dashed #F59E0B; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 8px; letter-spacing: 6px; margin: 20px 0;">
           ${otp}
         </div>
-        <p style="color: #991B1B; font-weight: bold;">Important: Do not share this OTP with anyone other than the assigned delivery boy.</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888; text-align: center;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        
+        <p style="color: #DC2626; font-size: 13px; font-weight: 600; text-align: center;">Important: Do not share this OTP with anyone other than the assigned delivery agent.</p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(toEmail, 'Delivery OTP Verification', html);
@@ -212,17 +259,17 @@ export class NotificationSenderService {
 
   async sendPaymentReceivedEmail(to: string, name: string, orderNumber: string, amount: number, paymentMode: string, transactionReference?: string) {
     const html = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-        <div style="text-align: center; margin-bottom: 25px;">
-          <h2 style="color: #10B981; margin: 0; font-size: 24px; font-weight: 700;">Payment Received!</h2>
-          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Thank you for your payment.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #D1FAE5; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #10B981; margin: 0; font-size: 22px;">Payment Received!</h2>
+          <p style="color: #047857; font-size: 14px; margin: 5px 0 0 0;">Thank you for your payment.</p>
         </div>
         
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear ${name},</p>
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">We have successfully received and processed your payment for order <strong>#${orderNumber}</strong>.</p>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">We have successfully received and processed your payment for order <strong>#${orderNumber}</strong>.</p>
         
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-          <h3 style="color: #1e293b; margin-top: 0; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Transaction Details</h3>
+        <div style="background-color: #F8FAFC; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+          <h3 style="color: #1E293B; margin-top: 0; margin-bottom: 12px; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Transaction Details</h3>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #475569;">
             <tr>
               <td style="padding: 6px 0; font-weight: 600;">Amount Paid:</td>
@@ -241,7 +288,7 @@ export class NotificationSenderService {
           </table>
         </div>
         
-        <p style="color: #334155; font-size: 14px; line-height: 1.5;">If you have any questions regarding this transaction, please reply to this email or contact our customer support.</p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.5;">If you have any questions regarding this transaction, please reply to this email.</p>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
         <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
@@ -259,13 +306,13 @@ export class NotificationSenderService {
     switch (status) {
       case 'New Order':
         statusDescription = 'Your laundry order has been received and is being reviewed by our team.';
-        nextStepNote = 'Our team will assign a pickup agent shortly. Watch out for the next email!';
+        nextStepNote = 'Our team will assign a pickup agent shortly. Watch out for the next update!';
         statusColor = '#4F46E5';
         bgColor = '#EEF2FF';
         break;
       case 'Pickup Scheduled':
         statusDescription = 'A pickup agent has been assigned and is scheduled to collect your clothes. Please keep your laundry ready!';
-        nextStepNote = 'Our agent will arrive at your doorstep as per the scheduled time. You will receive another alert when clothes are picked up.';
+        nextStepNote = 'Our agent will arrive at your doorstep as per the scheduled time.';
         statusColor = '#3B82F6';
         bgColor = '#DBEAFE';
         break;
@@ -278,14 +325,14 @@ export class NotificationSenderService {
       case 'Processing':
         statusDescription = 'Your clothes have arrived at our facility and are being carefully sorted and inspected before laundering.';
         nextStepNote = 'Our team is preparing your garments for the wash cycle. Next update: Washing!';
-        statusColor = '#EAB308';
-        bgColor = '#FEF9C3';
+        statusColor = '#D97706';
+        bgColor = '#FEF3C7';
         break;
       case 'Washing':
         statusDescription = 'Your clothes are currently in the washing machine, being cleaned with premium detergents.';
         nextStepNote = 'After washing, your clothes will be dried and ironed. Stay tuned!';
-        statusColor = '#06B6D4';
-        bgColor = '#CFFAFE';
+        statusColor = '#0284C7';
+        bgColor = '#E0F2FE';
         break;
       case 'Dry Cleaning':
         statusDescription = 'Your garments are undergoing professional dry cleaning using industry-grade solvents for a superior clean.';
@@ -296,20 +343,20 @@ export class NotificationSenderService {
       case 'Ironing':
         statusDescription = 'Your clothes are being precision-ironed and steam-pressed to give them a fresh, crisp finish.';
         nextStepNote = 'Almost there! Your garments will be packed and ready for delivery very soon.';
-        statusColor = '#F97316';
+        statusColor = '#EA580C';
         bgColor = '#FFEDD5';
         break;
       case 'Ready For Delivery':
         statusDescription = 'Excellent news! Your clean, fresh laundry is packed and ready to be dispatched for delivery.';
-        nextStepNote = 'A delivery agent will pick up your order shortly. You will receive a delivery OTP via email and SMS.';
+        nextStepNote = 'A delivery agent will pick up your order shortly. You will receive a delivery OTP.';
         statusColor = '#10B981';
         bgColor = '#D1FAE5';
         break;
       case 'Out For Delivery':
         statusDescription = 'Your fresh, clean clothes have been dispatched and are currently on their way to your doorstep!';
-        nextStepNote = 'Please be available to receive your order. A delivery OTP will be required to confirm receipt. Check your email/SMS!';
-        statusColor = '#06B6D4';
-        bgColor = '#CFFAFE';
+        nextStepNote = 'Please be available to receive your order. A delivery OTP will be required to confirm receipt.';
+        statusColor = '#0284C7';
+        bgColor = '#E0F2FE';
         break;
       case 'Delivered':
         statusDescription = 'Your order has been successfully delivered to your doorstep. We hope your clothes look and feel amazing!';
@@ -319,8 +366,8 @@ export class NotificationSenderService {
         break;
       case 'Cancelled':
         statusDescription = 'Your order has been cancelled as per your request or due to an unforeseen issue.';
-        nextStepNote = 'If you did not request this cancellation, please contact our support team immediately.';
-        statusColor = '#EF4444';
+        nextStepNote = 'If you did not request this cancellation, please contact our support team.';
+        statusColor = '#DC2626';
         bgColor = '#FEE2E2';
         break;
     }
@@ -328,19 +375,19 @@ export class NotificationSenderService {
     const updatedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
 
     const html = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-        <div style="text-align: center; margin-bottom: 25px; padding: 20px; background: ${bgColor}; border-radius: 10px;">
-          <h2 style="color: ${statusColor}; margin: 0; font-size: 22px; font-weight: 700;">Order Update: ${status}</h2>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; padding: 18px; background: ${bgColor}; border-radius: 8px;">
+          <h2 style="color: ${statusColor}; margin: 0; font-size: 22px;">Order Update: ${status}</h2>
           <p style="color: #64748b; font-size: 14px; margin: 5px 0 0 0;">Order #${orderNumber}</p>
         </div>
         
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
         <p style="color: #475569; font-size: 14px; line-height: 1.6;">Here is the latest update on your laundry order <strong style="color: ${statusColor};">#${orderNumber}</strong>:</p>
         
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid ${statusColor}; border-radius: 8px; padding: 18px 20px; margin: 20px 0;">
-          <h3 style="color: ${statusColor}; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">${status}</h3>
+        <div style="background-color: #F8FAFC; border: 1px solid #e2e8f0; border-left: 5px solid ${statusColor}; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <h3 style="color: ${statusColor}; margin: 0 0 6px 0; font-size: 16px;">${status}</h3>
           <p style="color: #334155; margin: 0; font-size: 14px; line-height: 1.6;">${statusDescription}</p>
-          <p style="color: #64748b; margin: 10px 0 0 0; font-size: 12px;">Updated at: ${updatedAt} IST</p>
+          <p style="color: #64748b; margin: 8px 0 0 0; font-size: 12px;">Updated at: ${updatedAt} IST</p>
         </div>
         
         <div style="background-color: #FFFBEB; border-left: 4px solid #F59E0B; border-radius: 4px; padding: 12px 16px; margin-bottom: 20px;">
@@ -348,7 +395,7 @@ export class NotificationSenderService {
         </div>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.<br>You are receiving this email because you placed an order with us.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.<br />You are receiving this email regarding your order with us.</p>
       </div>
     `;
     await this.sendEmail(to, `Order #${orderNumber} - Status: ${status}`, html);

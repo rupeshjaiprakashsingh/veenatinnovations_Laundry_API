@@ -86,41 +86,54 @@ export class AuthService {
   }
 
   async registerCustomer(dto: RegisterCustomerDto) {
-    // Check if email or mobile exists
-    const emailExists = await this.prisma.customer.findUnique({ where: { email: dto.email } });
+    if (!dto.email || !dto.email.trim()) {
+      throw new BadRequestException('Email address is required');
+    }
+    if (!dto.mobileNumber || !dto.mobileNumber.trim()) {
+      throw new BadRequestException('Mobile number is required');
+    }
+
+    const emailTrimmed = dto.email.trim();
+    const emailExists = await this.prisma.customer.findFirst({ where: { email: emailTrimmed } });
     if (emailExists) throw new BadRequestException('Email already registered');
 
+    const mobileTrimmed = dto.mobileNumber.trim();
+    const altMobile = mobileTrimmed.startsWith('+91') ? mobileTrimmed.slice(3) : `+91${mobileTrimmed}`;
     const mobileExists = await this.prisma.customer.findFirst({
       where: {
         OR: [
-          { mobileNumber: dto.mobileNumber },
-          { mobileNumber: dto.mobileNumber.startsWith('+91') ? dto.mobileNumber.slice(3) : `+91${dto.mobileNumber}` }
+          { mobileNumber: mobileTrimmed },
+          { mobileNumber: altMobile }
         ]
       }
     });
     if (mobileExists) throw new BadRequestException('Mobile number already registered');
 
     // Verify manual CustomerCode uniqueness if provided, else auto-generate
-    if (dto.customerCode) {
-      const codeExists = await this.prisma.customer.findUnique({
-        where: { customerCode: dto.customerCode },
+    let customerCode = dto.customerCode && dto.customerCode.trim() ? dto.customerCode.trim() : '';
+    if (customerCode) {
+      const codeExists = await this.prisma.customer.findFirst({
+        where: { customerCode },
       });
       if (codeExists) {
         throw new BadRequestException('Customer code already registered');
       }
+    } else {
+      const count = await this.prisma.customer.count();
+      customerCode = `CUST-${String(count + 1).padStart(4, '0')}`;
     }
-    const count = await this.prisma.customer.count();
-    const customerCode = dto.customerCode || `CUST-${String(count + 1).padStart(4, '0')}`;
 
     // Check if referralCode is valid if provided
     let referrerId: number | null = null;
-    if (dto.referralCode) {
+    if (dto.referralCode && dto.referralCode.trim()) {
+      const refTrimmed = dto.referralCode.trim();
+      const altRef = refTrimmed.startsWith('+91') ? refTrimmed.slice(3) : `+91${refTrimmed}`;
       const referrer = await this.prisma.customer.findFirst({
         where: {
           OR: [
-            { customerCode: dto.referralCode },
-            { mobileNumber: dto.referralCode },
-            { mobileNumber: dto.referralCode.startsWith('+91') ? dto.referralCode.slice(3) : `+91${dto.referralCode}` }
+            { customerCode: refTrimmed },
+            { mobileNumber: refTrimmed },
+            { mobileNumber: altRef }
           ]
         }
       });

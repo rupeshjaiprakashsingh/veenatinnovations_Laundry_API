@@ -159,8 +159,6 @@ export class AuthService {
         pincode: dto.pincode,
         landmark: dto.landmark,
         houseDetails: dto.houseDetails,
-        lat: dto.lat,
-        lng: dto.lng,
         gender: dto.gender,
         dob: dto.dob,
         referralCode: dto.referralCode,

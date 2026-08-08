@@ -54,6 +54,53 @@ export class NotificationController {
   }
 
   @Public()
+  @Get('send-otp')
+  @ApiOperation({ summary: 'Send 4-digit OTP email & SMS to customer (Public)' })
+  async sendOtp(@Query('email') email: string, @Query('otp') otp: string, @Query('mobile') mobile: string) {
+    const toEmail = (email || 'rupeshsingh7208@gmail.com').trim();
+    const otpCode = (otp || '1234').trim();
+    try {
+      const info = await this.notificationSender.sendEmail(
+        toEmail,
+        `Your Grivana Login OTP: ${otpCode}`,
+        `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 500px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 15px; border-radius: 8px;">
+            <h2 style="color: #4F46E5; margin: 0; font-size: 20px;">Grivana OTP Verification</h2>
+          </div>
+          <p style="color: #334155; font-size: 14px;">Dear Customer,</p>
+          <p style="color: #475569; font-size: 14px; line-height: 1.5;">Your 4-digit verification code to log in to Grivana Laundry app is:</p>
+          
+          <div style="background-color: #FFFBEB; border: 2px dashed #F59E0B; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+            ${otpCode}
+          </div>
+          
+          <p style="color: #64748B; font-size: 12px; text-align: center;">This code is valid for 10 minutes. Do not share this OTP with anyone.</p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Grivana Laundry. All rights reserved.</p>
+        </div>
+        `
+      );
+
+      if (mobile) {
+        await this.notificationSender.sendSMS(mobile, `Grivana Laundry: Your 4-digit OTP is ${otpCode}. Valid for 10 minutes.`);
+      }
+
+      return {
+        success: true,
+        message: `OTP ${otpCode} sent to ${toEmail}`,
+        messageId: info?.messageId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Failed to send OTP to ${toEmail}`,
+        error: err?.message || err,
+      };
+    }
+  }
+
+  @Public()
   @Get('test-all-emails')
   @ApiOperation({ summary: 'Send test emails for all key events to a specified email address' })
   async testAllEmails(@Query('email') email: string) {

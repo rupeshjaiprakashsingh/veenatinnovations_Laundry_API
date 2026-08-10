@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
 import { CreateNotificationDto } from './notification.dto';
@@ -7,6 +7,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { NotificationSenderService } from './notification-sender.service';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @ApiTags('Notification Log Management')
 @ApiBearerAuth()
@@ -16,13 +17,17 @@ export class NotificationController {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly notificationSender: NotificationSenderService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Public()
   @Get('test-email')
   @ApiOperation({ summary: 'Send a test email for SMTP verification (Public)' })
   async testEmail(@Query('email') email: string) {
-    const toEmail = (email || 'rupeshsingh7208@gmail.com').trim();
+    const toEmail = (email || '').trim();
+    if (!toEmail || !toEmail.includes('@')) {
+      throw new BadRequestException('Please provide a valid recipient email query parameter: ?email=user@domain.com');
+    }
     try {
       const info = await this.notificationSender.sendEmail(
         toEmail,
@@ -44,7 +49,7 @@ export class NotificationController {
         message: `Verification test email sent to ${toEmail}`,
         messageId: info?.messageId,
       };
-    } catch (err) {
+    } catch (err: any) {
       return {
         success: false,
         message: `Failed to send email to ${toEmail}`,
@@ -57,30 +62,52 @@ export class NotificationController {
   @Get('send-otp')
   @ApiOperation({ summary: 'Send 4-digit OTP email & SMS to customer (Public)' })
   async sendOtp(@Query('email') email: string, @Query('otp') otp: string, @Query('mobile') mobile: string) {
-    const toEmail = (email || 'rupeshsingh7208@gmail.com').trim();
+    let toEmail = (email || '').trim();
     const otpCode = (otp || '1234').trim();
+
+    // Dynamically look up customer profile email by mobile number if email is omitted or invalid
+    if (mobile && (!toEmail || !toEmail.includes('@'))) {
+      const cleanMobile = mobile.replace(/[^0-9]/g, '');
+      const raw10 = cleanMobile.length >= 10 ? cleanMobile.slice(-10) : cleanMobile;
+      const customer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [
+            { mobileNumber: raw10 },
+            { mobileNumber: `+91${raw10}` },
+            { mobileNumber: `91${raw10}` },
+          ],
+        },
+      });
+      if (customer && customer.email && customer.email.includes('@')) {
+        toEmail = customer.email.trim();
+      }
+    }
+
     try {
-      const info = await this.notificationSender.sendEmail(
-        toEmail,
-        `Your Grivana Login OTP: ${otpCode}`,
-        `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 500px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
-          <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 15px; border-radius: 8px;">
-            <h2 style="color: #4F46E5; margin: 0; font-size: 20px;">Grivana OTP Verification</h2>
+      let info: any = null;
+      if (toEmail && toEmail.includes('@')) {
+        info = await this.notificationSender.sendEmail(
+          toEmail,
+          `Your Grivana Login OTP: ${otpCode}`,
+          `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 500px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 15px; border-radius: 8px;">
+              <h2 style="color: #4F46E5; margin: 0; font-size: 20px;">Grivana OTP Verification</h2>
+            </div>
+            <p style="color: #334155; font-size: 14px;">Dear Customer,</p>
+            <p style="color: #475569; font-size: 14px; line-height: 1.5;">Your 4-digit verification code to log in to Grivana Laundry app is:</p>
+            
+            <div style="background-color: #FFFBEB; border: 2px dashed #F59E0B; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+              ${otpCode}
+            </div>
+            
+            <p style="color: #64748B; font-size: 12px; text-align: center;">This code is valid for 10 minutes. Do not share this OTP with anyone.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Grivana Laundry. All rights reserved.</p>
           </div>
-          <p style="color: #334155; font-size: 14px;">Dear Customer,</p>
-          <p style="color: #475569; font-size: 14px; line-height: 1.5;">Your 4-digit verification code to log in to Grivana Laundry app is:</p>
-          
-          <div style="background-color: #FFFBEB; border: 2px dashed #F59E0B; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
-            ${otpCode}
-          </div>
-          
-          <p style="color: #64748B; font-size: 12px; text-align: center;">This code is valid for 10 minutes. Do not share this OTP with anyone.</p>
-          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-bottom: 0;">© Grivana Laundry. All rights reserved.</p>
-        </div>
-        `
-      );
+          `
+        );
+      }
 
       if (mobile) {
         await this.notificationSender.sendSMS(mobile, `Grivana Laundry: Your 4-digit OTP is ${otpCode}. Valid for 10 minutes.`);
@@ -88,13 +115,13 @@ export class NotificationController {
 
       return {
         success: true,
-        message: `OTP ${otpCode} sent to ${toEmail}`,
+        message: toEmail ? `OTP ${otpCode} sent to ${toEmail}` : `OTP ${otpCode} sent via SMS to ${mobile}`,
         messageId: info?.messageId,
       };
     } catch (err: any) {
       return {
         success: false,
-        message: `Failed to send OTP to ${toEmail}`,
+        message: `Failed to send OTP to ${toEmail || mobile}`,
         error: err?.message || err,
       };
     }
@@ -104,7 +131,10 @@ export class NotificationController {
   @Get('test-all-emails')
   @ApiOperation({ summary: 'Send test emails for all key events to a specified email address' })
   async testAllEmails(@Query('email') email: string) {
-    const targetEmail = (email || 'rupeshsingh7208@gmail.com').trim();
+    const targetEmail = (email || '').trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      throw new BadRequestException('Please provide a valid target recipient email: ?email=user@domain.com');
+    }
     const name = 'Rupesh Singh';
     const orderNumber = 'ORD-TEST-' + Math.floor(1000 + Math.random() * 9000);
     const amount = 350;

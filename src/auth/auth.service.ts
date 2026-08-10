@@ -131,6 +131,7 @@ export class AuthService {
       const referrer = await this.prisma.customer.findFirst({
         where: {
           OR: [
+            { referralCode: refTrimmed },
             { customerCode: refTrimmed },
             { mobileNumber: refTrimmed },
             { mobileNumber: altRef }
@@ -161,7 +162,7 @@ export class AuthService {
         houseDetails: dto.houseDetails,
         gender: dto.gender,
         dob: dto.dob,
-        referralCode: dto.referralCode,
+        referralCode: customerCode,
         isActive: true,
       },
     });

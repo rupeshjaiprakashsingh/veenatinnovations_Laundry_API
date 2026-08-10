@@ -117,6 +117,7 @@ export class OrderRepository extends BasePrismaRepository<Order> {
       include: {
         customer: true,
         branch: true,
+        laundryShop: true,
         orderItems: {
           include: { service: true }
         },

@@ -142,6 +142,8 @@ export class PickupService {
             ? {
                 id: activeOrder.id,
                 orderNumber: activeOrder.orderNumber,
+                netAmount: activeOrder.netAmount,
+                paymentStatus: activeOrder.paymentStatus,
                 laundryShop: activeOrder.laundryShop,
               }
             : null,

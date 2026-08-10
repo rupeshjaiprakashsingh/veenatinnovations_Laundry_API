@@ -219,12 +219,13 @@ export class DeliveryService {
         },
       });
 
-      // If delivered, update order status to Delivered
+      // If delivered, update order status to Delivered & paymentStatus to Paid
       if (dto.deliveryStatus === 'Delivered') {
         const order = await tx.order.update({
           where: { id: delivery.orderId },
           data: {
             orderStatus: 'Delivered',
+            paymentStatus: 'Paid',
             deliveryDate: new Date(),
           },
           include: { customer: true, orderItems: { include: { service: true } } },

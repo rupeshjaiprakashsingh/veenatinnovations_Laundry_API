@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as express from 'express';
+import { join } from 'path';
 import { winstonLogger } from './common/logger/winston.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -12,8 +14,9 @@ async function bootstrap() {
     logger: winstonLogger,
   });
 
-  // Security Middlewares
-  app.use(helmet());
+  // Security Middlewares & Static File Access
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
   
   // CORS configuration
   app.enableCors({

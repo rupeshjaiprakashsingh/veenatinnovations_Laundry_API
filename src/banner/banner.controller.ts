@@ -1,8 +1,12 @@
 import {
   Controller, Get, Post, Body, Put, Param, Delete,
-  UseGuards, ParseIntPipe,
+  UseGuards, ParseIntPipe, UseInterceptors, UploadedFile, BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { BannerService } from './banner.service';
 import { CreateBannerDto, UpdateBannerDto } from './banner.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -29,6 +33,39 @@ export class BannerController {
   @ApiOperation({ summary: 'Get all banners including inactive ones (Admin Panel only)' })
   findAllAdmin() {
     return this.bannerService.findAll(false);
+  }
+
+  @Post('upload')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SuperAdmin', 'BranchManager')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads', 'banners');
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname) || '.png';
+          cb(null, `banner-${uniqueSuffix}${ext}`);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a banner image file (Staff only)' })
+  uploadFile(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('No image file provided');
+    }
+    const relativeUrl = `/uploads/banners/${file.filename}`;
+    return { imageUrl: relativeUrl };
   }
 
   @Post()

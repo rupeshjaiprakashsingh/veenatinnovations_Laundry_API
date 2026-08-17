@@ -61,7 +61,8 @@ export class NotificationSenderService {
   async sendEmail(to: string, subject: string, html: string) {
     const brevoKey = (process.env.BREVO_API_KEY || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
-    const fromName = 'Saimorphix Innovations Laundry';
+    const fromName = 'Saimorphix Innovations';
+
     const fromEmail = emailUser || 'no-reply@veenatinnovations.com';
 
     // 1. Brevo HTTP API (Primary when BREVO_API_KEY is set)
@@ -127,7 +128,7 @@ export class NotificationSenderService {
     const html = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 20px; border-radius: 8px;">
-          <h2 style="color: #4F46E5; margin: 0; font-size: 22px;">Welcome to Saimorphix Innovations Laundry</h2>
+          <h2 style="color: #4F46E5; margin: 0; font-size: 22px;">Welcome to Saimorphix Innovations</h2>
         </div>
         <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
         <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for registering with us. We are excited to provide you with premium laundry, dry cleaning, and ironing services delivered right to your doorstep!</p>
@@ -140,10 +141,10 @@ export class NotificationSenderService {
           </ul>
         </div>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
-    await this.sendEmail(to, 'Welcome to Saimorphix Innovations Laundry!', html);
+    await this.sendEmail(to, 'Welcome to Saimorphix Innovations!', html);
   }
 
   async sendOrderCreatedEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
@@ -181,7 +182,7 @@ export class NotificationSenderService {
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Order Confirmation #${orderNumber}`, html);
@@ -202,7 +203,7 @@ export class NotificationSenderService {
           <h2 style="color: #10B981; margin: 0; font-size: 22px;">Delivery Complete &amp; Invoice</h2>
         </div>
         <p style="color: #334155; font-size: 15px;">Dear <strong>${name}</strong>,</p>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for choosing Saimorphix Innovations Laundry. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Thank you for choosing Saimorphix Innovations. Your order <strong>#${orderNumber}</strong> has been successfully delivered to your doorstep.</p>
 
         <div style="background-color: #F8FAFC; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 20px 0;">
           <h3 style="color: #1E293B; margin-top: 0; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Invoice Details</h3>
@@ -223,7 +224,7 @@ export class NotificationSenderService {
         </div>
 
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Invoice for Order #${orderNumber}`, html);
@@ -250,11 +251,11 @@ export class NotificationSenderService {
         <p style="color: #DC2626; font-size: 13px; font-weight: 600; text-align: center;">Important: Do not share this OTP with anyone other than the assigned delivery agent.</p>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(toEmail, 'Delivery OTP Verification', html);
-    await this.sendSMS(toMobile, `Saimorphix Innovations Laundry: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
+    await this.sendSMS(toMobile, `Saimorphix Innovations: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
   }
 
   async sendPaymentReceivedEmail(to: string, name: string, orderNumber: string, amount: number, paymentMode: string, transactionReference?: string) {
@@ -291,7 +292,7 @@ export class NotificationSenderService {
         <p style="color: #334155; font-size: 14px; line-height: 1.5;">If you have any questions regarding this transaction, please reply to this email.</p>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
     await this.sendEmail(to, `Payment Confirmation: Order #${orderNumber}`, html);
@@ -360,7 +361,7 @@ export class NotificationSenderService {
         break;
       case 'Delivered':
         statusDescription = 'Your order has been successfully delivered to your doorstep. We hope your clothes look and feel amazing!';
-        nextStepNote = 'Thank you for choosing Saimorphix Innovations Laundry. We look forward to serving you again!';
+        nextStepNote = 'Thank you for choosing Saimorphix Innovations. We look forward to serving you again!';
         statusColor = '#10B981';
         bgColor = '#D1FAE5';
         break;
@@ -395,7 +396,7 @@ export class NotificationSenderService {
         </div>
         
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations Laundry. All rights reserved.<br />You are receiving this email regarding your order with us.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.<br />You are receiving this email regarding your order with us.</p>
       </div>
     `;
     await this.sendEmail(to, `Order #${orderNumber} - Status: ${status}`, html);

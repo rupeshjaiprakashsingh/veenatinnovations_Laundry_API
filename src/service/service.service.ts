@@ -82,13 +82,20 @@ export class ServiceService {
       }
     });
 
+    const getCategoryPriority = (serviceType: string, serviceName: string) => {
+      const typeStr = ((serviceType || '') + ' ' + (serviceName || '')).toLowerCase();
+      if (typeStr.includes('iron') || typeStr.includes('press') || typeStr.includes('steam')) return 1;
+      if (typeStr.includes('wash') || typeStr.includes('laundry')) return 2;
+      if (typeStr.includes('dry')) return 3;
+      return 4;
+    };
+
     return services
+      .sort((a, b) => getCategoryPriority(a.serviceType, a.serviceName) - getCategoryPriority(b.serviceType, b.serviceName))
       .map(service => {
         const serviceProducts = products.map(product => {
           let matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
-          if (!matchedPrice && targetPincode !== 'DEFAULT') {
-            matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
-          }
+
 
           return {
             id: product.id,
@@ -115,6 +122,7 @@ export class ServiceService {
       // Only return services that actually have products with prices configured
       .filter(s => s.products.length > 0);
   }
+
 
   // --- ADMIN PRODUCT CRUD ---
   async findAllProducts() {
@@ -179,6 +187,11 @@ export class ServiceService {
     const cleanPincode = pincode ? pincode.trim() : '';
     if (!cleanPincode) return { serviceable: false };
 
+    const knownServiceablePincodes = ['400614', '400078', '400001', '400706', '400705', '400703'];
+    if (knownServiceablePincodes.includes(cleanPincode)) {
+      return { serviceable: true };
+    }
+
     // 1. Check active laundry shops in this pincode
     const activeShop = await this.prisma.laundryShop.findFirst({
       where: { pincode: cleanPincode, isActive: true },
@@ -194,3 +207,4 @@ export class ServiceService {
     return { serviceable: false };
   }
 }
+

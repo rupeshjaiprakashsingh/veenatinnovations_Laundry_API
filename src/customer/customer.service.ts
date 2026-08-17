@@ -11,8 +11,33 @@ export class CustomerService {
   ) {}
 
   async findAll() {
-    return this.customerRepository.findAll();
+    const customers = await this.customerRepository.findAll();
+    const knownPincodes = ['400614', '400078', '400001', '400706', '400705', '400703'];
+    return Promise.all(
+      customers.map(async (c) => {
+        let isServiceable = true;
+        if (c.pincode) {
+          const cleanP = c.pincode.trim();
+          if (knownPincodes.includes(cleanP)) {
+            isServiceable = true;
+          } else {
+            const shop = await this.prisma.laundryShop.findFirst({
+              where: { pincode: cleanP, isActive: true },
+            });
+            const price = await this.prisma.servicePrice.findFirst({
+              where: { pincode: cleanP, isActive: true },
+            });
+            isServiceable = !!(shop || price);
+          }
+        }
+        return {
+          ...c,
+          isServiceable,
+        };
+      })
+    );
   }
+
 
   async findOne(id: number) {
     const customer = await this.customerRepository.findById(id);
@@ -133,10 +158,57 @@ export class CustomerService {
 
   async remove(id: number) {
     await this.findOne(id);
-    try {
-      return await this.customerRepository.delete(id);
-    } catch (error) {
-      throw new BadRequestException('Cannot delete customer due to existing orders or dependencies');
-    }
+    return await this.prisma.$transaction(async (tx) => {
+      const custOrders = await tx.order.findMany({
+        where: { customerId: id },
+        select: { id: true },
+      });
+      const orderIds = custOrders.map((o) => o.id);
+
+      if (orderIds.length > 0) {
+        await tx.delivery.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.orderStatusHistory.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.order.deleteMany({ where: { id: { in: orderIds } } });
+      }
+
+      await tx.referral.deleteMany({
+        where: { OR: [{ referrerId: id }, { referredId: id }] },
+      });
+      await tx.notification.deleteMany({ where: { customerId: id } });
+      await tx.address.deleteMany({ where: { customerId: id } });
+      await tx.pickupRequest.deleteMany({ where: { customerId: id } });
+
+      return await tx.customer.delete({ where: { id } });
+    });
+  }
+
+  async removeAll() {
+    return await this.prisma.$transaction(async (tx) => {
+      const referrals = await tx.referral.deleteMany({});
+      const notifications = await tx.notification.deleteMany({});
+      const addresses = await tx.address.deleteMany({});
+      const pickupRequests = await tx.pickupRequest.deleteMany({});
+      const deliveries = await tx.delivery.deleteMany({});
+      const payments = await tx.payment.deleteMany({});
+      const orderItems = await tx.orderItem.deleteMany({});
+      const orderStatusHistories = await tx.orderStatusHistory.deleteMany({});
+      const orders = await tx.order.deleteMany({});
+      const customers = await tx.customer.deleteMany({});
+
+      return {
+        message: 'All users and dependent data successfully removed',
+        deletedCounts: {
+          customers: customers.count,
+          orders: orders.count,
+          addresses: addresses.count,
+          pickupRequests: pickupRequests.count,
+          notifications: notifications.count,
+          referrals: referrals.count,
+        },
+      };
+    });
   }
 }
+

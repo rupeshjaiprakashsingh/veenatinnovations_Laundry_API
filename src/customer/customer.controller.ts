@@ -44,6 +44,13 @@ export class CustomerController {
     return this.customerService.update(id, updateCustomerDto);
   }
 
+  @Delete('all')
+  @Roles('SuperAdmin')
+  @ApiOperation({ summary: 'Delete all customers and dependent user data (SuperAdmin only)' })
+  removeAll() {
+    return this.customerService.removeAll();
+  }
+
   @Delete(':id')
   @Roles('SuperAdmin')
   @ApiOperation({ summary: 'Delete a customer (SuperAdmin only)' })
@@ -51,3 +58,4 @@ export class CustomerController {
     return this.customerService.remove(id);
   }
 }
+

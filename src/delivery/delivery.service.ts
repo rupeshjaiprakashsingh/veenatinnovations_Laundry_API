@@ -244,8 +244,9 @@ export class DeliveryService {
 
         this.notificationSender.sendSMS(
           order.customer.mobileNumber,
-          `Saimorphix Innovations Laundry: Your order #${order.orderNumber} has been delivered successfully. Paid Amount: ₹${order.netAmount}. Thank you!`
+          `Saimorphix Innovations: Your order #${order.orderNumber} has been delivered successfully. Paid Amount: ₹${order.netAmount}. Thank you!`
         ).catch(err => {
+
           console.error('Invoice delivery SMS failed:', err);
         });
 

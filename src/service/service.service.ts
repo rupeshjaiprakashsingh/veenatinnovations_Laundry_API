@@ -61,9 +61,14 @@ export class ServiceService {
     return this.serviceRepository.delete(id);
   }
 
-  // Dynamic Pricing Method
+  // Dynamic Pricing Method — only returns services/products with prices
+  // configured for the EXACT pincode in the Admin Panel Pricing table.
+  // If no pincode is provided or no prices exist for that pincode, returns empty.
   async getPricing(pincode?: string) {
-    const targetPincode = pincode && pincode.trim().length > 0 ? pincode.trim() : 'DEFAULT';
+    const targetPincode = pincode && pincode.trim().length > 0 ? pincode.trim() : null;
+
+    // If no pincode provided, return empty — user must have a pincode set
+    if (!targetPincode) return [];
 
     const services = await this.prisma.service.findMany({
       where: { isActive: true },
@@ -75,12 +80,16 @@ export class ServiceService {
       orderBy: { id: 'asc' },
     });
 
+    // Only fetch prices for the EXACT pincode from Admin Panel — no DEFAULT fallback
     const prices = await this.prisma.servicePrice.findMany({
       where: {
         isActive: true,
-        pincode: { in: [targetPincode, 'DEFAULT'] }
+        pincode: targetPincode,
       }
     });
+
+    // If no prices exist for this pincode at all, return empty
+    if (prices.length === 0) return [];
 
     const getCategoryPriority = (serviceType: string, serviceName: string) => {
       const typeStr = ((serviceType || '') + ' ' + (serviceName || '')).toLowerCase();
@@ -94,8 +103,7 @@ export class ServiceService {
       .sort((a, b) => getCategoryPriority(a.serviceType, a.serviceName) - getCategoryPriority(b.serviceType, b.serviceName))
       .map(service => {
         const serviceProducts = products.map(product => {
-          let matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
-
+          const matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
 
           return {
             id: product.id,
@@ -183,22 +191,20 @@ export class ServiceService {
     });
   }
 
+  // Check serviceability ONLY from Admin Panel database —
+  // returns true only if there are active laundry shops OR active service prices
+  // configured for this exact pincode in the Admin Panel.
   async checkServiceability(pincode: string): Promise<{ serviceable: boolean }> {
     const cleanPincode = pincode ? pincode.trim() : '';
     if (!cleanPincode) return { serviceable: false };
 
-    const knownServiceablePincodes = ['400614', '400078', '400001', '400706', '400705', '400703'];
-    if (knownServiceablePincodes.includes(cleanPincode)) {
-      return { serviceable: true };
-    }
-
-    // 1. Check active laundry shops in this pincode
+    // 1. Check active laundry shops in this pincode (Admin Panel → Laundry Shops)
     const activeShop = await this.prisma.laundryShop.findFirst({
       where: { pincode: cleanPincode, isActive: true },
     });
     if (activeShop) return { serviceable: true };
 
-    // 2. Check active service prices for this pincode
+    // 2. Check active service prices for this pincode (Admin Panel → Services → Pricing)
     const activePrice = await this.prisma.servicePrice.findFirst({
       where: { pincode: cleanPincode, isActive: true },
     });

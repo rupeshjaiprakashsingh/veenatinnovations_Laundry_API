@@ -3,10 +3,8 @@ import { PaymentRepository, OrderRepository } from '../common/repositories/laund
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreatePaymentDto, CreateRazorpayOrderDto, VerifyRazorpayPaymentDto } from './payment.dto';
 import { NotificationSenderService } from '../notification/notification-sender.service';
-import {
-  IPaymentGatewayProvider,
-  PAYMENT_GATEWAY_PROVIDER,
-} from './interfaces/payment-gateway.interface';
+import type { IPaymentGatewayProvider } from './interfaces/payment-gateway.interface';
+import { PAYMENT_GATEWAY_PROVIDER } from './interfaces/payment-gateway.interface';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -20,7 +18,7 @@ export class PaymentService {
     private readonly notificationSender: NotificationSenderService,
     private readonly configService: ConfigService,
     @Inject(PAYMENT_GATEWAY_PROVIDER)
-    private readonly gatewayProvider: IPaymentGatewayProvider,
+    private readonly gatewayProvider: any,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto) {

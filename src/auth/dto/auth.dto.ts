@@ -180,6 +180,30 @@ export class RefreshTokenDto {
   refreshToken!: string;
 }
 
+export class SendOtpDto {
+  @ApiProperty({ example: '9109992292' })
+  @IsString()
+  @IsNotEmpty()
+  mobileNumber!: string;
+
+  @ApiProperty({ example: '2323', required: false })
+  @IsOptional()
+  @IsString()
+  otp?: string;
+}
+
+export class VerifyOtpDto {
+  @ApiProperty({ example: '9109992292' })
+  @IsString()
+  @IsNotEmpty()
+  mobileNumber!: string;
+
+  @ApiProperty({ example: '5829' })
+  @IsString()
+  @IsNotEmpty()
+  otp!: string;
+}
+
 export class PhoneLoginDto {
   @ApiProperty({ example: '9555555555', description: 'Customer mobile number' })
   @IsString()

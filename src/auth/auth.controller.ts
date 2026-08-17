@@ -14,6 +14,8 @@ import {
   ResetPasswordDto,
   RefreshTokenDto,
   PhoneLoginDto,
+  SendOtpDto,
+  VerifyOtpDto,
 } from './dto/auth.dto';
 
 @ApiTags('Authentication')
@@ -38,6 +40,25 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Phone login checked' })
   phoneLogin(@Body() phoneLoginDto: PhoneLoginDto) {
     return this.authService.phoneLogin(phoneLoginDto);
+  }
+
+  @Public()
+  @Post('send-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send Login OTP via SMSIndiaHub SMS Gateway' })
+  @ApiResponse({ status: 200, description: 'OTP SMS sent successfully' })
+  sendOtp(@Body() sendOtpDto: SendOtpDto) {
+    return this.authService.sendOtp(sendOtpDto);
+  }
+
+  @Public()
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify Login OTP with 10-minute expiration check' })
+  @ApiResponse({ status: 200, description: 'OTP verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyOtp(verifyOtpDto);
   }
 
   @Public()

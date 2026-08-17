@@ -124,6 +124,57 @@ export class NotificationSenderService {
     console.log(`[SMS SENT] To: ${to} | Message: "${message}"`);
   }
 
+  /**
+   * Send Login OTP SMS via SMSIndiaHub Gateway:
+   * URL: http://cloud.smsindiahub.in/vendorsms/pushsms.aspx
+   * Approved Template: Your Login OTP for verification is ##var##. Please do not share this OTP with anyone. It is valid for 10 minutes.SMORPH
+   */
+  async sendOtpSMS(mobileNumber: string, otp: string) {
+    const user = (process.env.SMS_USER || 'saimorphix').trim();
+    const password = (process.env.SMS_PASSWORD || 'India@2026').trim();
+    const senderId = (process.env.SMS_SENDER_ID || 'SMORPH').trim();
+
+    // Ensure 10-digit mobile number has 91 country code prefix
+    let cleanMobile = (mobileNumber || '').replace(/\D/g, '');
+    if (cleanMobile.length === 10) {
+      cleanMobile = '91' + cleanMobile;
+    }
+
+    const entityId = (process.env.SMS_ENTITY_ID || '').trim();
+    const templateId = (process.env.SMS_TEMPLATE_ID || '').trim();
+
+    const message = `Your Login OTP for verification is ${otp}. Please do not share this OTP with anyone. It is valid for 10 minutes.SMORPH`;
+
+    const paramObj: any = {
+      user: user,
+      password: password,
+      msisdn: cleanMobile,
+      sid: senderId,
+      msg: message,
+      fl: '0',
+      gwid: '2',
+    };
+
+    if (entityId) paramObj.EntityId = entityId;
+    if (templateId) paramObj.TemplateId = templateId;
+
+    const params = new URLSearchParams(paramObj);
+
+    const apiUrl = `http://cloud.smsindiahub.in/vendorsms/pushsms.aspx?${params.toString()}`;
+
+    console.log(`[SMS OTP SENDING] To=${cleanMobile} | OTP=${otp}`);
+
+    try {
+      const response = await fetch(apiUrl);
+      const resultText = await response.text();
+      console.log(`[SMS OTP RESPONSE] Status=${response.status} | Body=${resultText}`);
+      return { success: response.ok, responseText: resultText };
+    } catch (err: any) {
+      console.error(`[SMS OTP ERROR] Failed to send SMS via SMSIndiaHub:`, err?.message || err);
+      return { success: false, error: err?.message || err };
+    }
+  }
+
   async sendRegistrationEmail(to: string, name: string) {
     const html = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">

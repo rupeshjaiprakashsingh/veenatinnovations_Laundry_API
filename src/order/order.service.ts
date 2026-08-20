@@ -407,18 +407,25 @@ export class OrderService implements OnModuleInit {
         },
       });
 
-      // Send order confirmation email
-      this.notificationSender.sendOrderCreatedEmail(
-        order.customer.email,
-        order.customer.firstName,
-        order.orderNumber,
-        order.netAmount,
-        order.orderItems
-      ).catch(err => {
-        console.error('Order created confirmation email failed:', err);
-      });
+      // Send order confirmation email — outside of transaction so DB commit is
+      // not held open waiting for a network call to the email provider.
+      const createdOrder = this.enrichOrderWithBillingDetails(order);
 
-      return this.enrichOrderWithBillingDetails(order);
+      if (order.customer?.email && order.customer.email.trim().includes('@')) {
+        this.notificationSender.sendOrderCreatedEmail(
+          order.customer.email.trim(),
+          order.customer.firstName || 'Customer',
+          order.orderNumber,
+          order.netAmount,
+          order.orderItems
+        ).catch(err => {
+          console.error(`[ORDER EMAIL FAILED] Order ${order.orderNumber} to ${order.customer.email}:`, err?.message || err);
+        });
+      } else {
+        console.warn(`[ORDER EMAIL SKIPPED] Customer has no valid email. Order: ${order.orderNumber} | customerId: ${order.customerId}`);
+      }
+
+      return createdOrder;
     });
   }
 
@@ -532,16 +539,18 @@ export class OrderService implements OnModuleInit {
       },
     });
 
-    // Send order status update email
-    if (order.customer?.email) {
+    // Send order status update email (only if customer has a valid email)
+    if (order.customer?.email && order.customer.email.trim().includes('@')) {
       this.notificationSender.sendOrderStatusUpdateEmail(
-        order.customer.email,
-        order.customer.firstName,
+        order.customer.email.trim(),
+        order.customer.firstName || 'Customer',
         order.orderNumber,
         dto.orderStatus
       ).catch(err => {
-        console.error('Order status update email failed:', err);
+        console.error(`[STATUS EMAIL FAILED] Order ${order.orderNumber} status=${dto.orderStatus}:`, err?.message || err);
       });
+    } else {
+      console.warn(`[STATUS EMAIL SKIPPED] No valid email for order ${order.orderNumber} | customerId: ${order.customerId}`);
     }
 
     return this.enrichOrderWithBillingDetails(updated);

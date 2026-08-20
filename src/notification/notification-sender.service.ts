@@ -53,70 +53,94 @@ export class NotificationSenderService {
   }
 
   /**
-   * Send Email with Gmail anti-spam best practices:
+   * Send Email with retry logic (up to 3 attempts, 2s delay between retries).
+   * Tries Brevo HTTP API first (if BREVO_API_KEY is set), then falls back to SMTP.
+   * Anti-spam best practices:
    * - Zero external links (no <a href="..."> tags)
    * - Zero attachments
    * - Clean, responsive inline HTML
    */
   async sendEmail(to: string, subject: string, html: string) {
+    // Guard: skip if recipient email is missing
+    if (!to || !to.trim() || !to.includes('@')) {
+      console.warn(`[EMAIL SKIPPED] Invalid or missing recipient email: "${to}" | subject="${subject}"`);
+      return { messageId: 'skipped', skipped: true };
+    }
+
     const brevoKey = (process.env.BREVO_API_KEY || '').trim();
     const emailUser = (process.env.EMAIL_USER || '').trim();
-    const fromName = 'Saimorphix Innovations';
-
+    const fromName = 'Grivana Laundry';
     const fromEmail = emailUser || 'no-reply@veenatinnovations.com';
+
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
+
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     // 1. Brevo HTTP API (Primary when BREVO_API_KEY is set)
     if (brevoKey) {
-      console.log(`[EMAIL SENDING] Brevo API -> to=${to} subject="${subject}"`);
-      try {
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'api-key': brevoKey,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            sender: { name: fromName, email: fromEmail },
-            to: [{ email: to }],
-            subject,
-            htmlContent: html,
-          }),
-        });
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          console.log(`[EMAIL SENDING] Brevo API attempt ${attempt}/${MAX_RETRIES} -> to=${to} subject="${subject}"`);
+          const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'accept': 'application/json',
+              'api-key': brevoKey,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              sender: { name: fromName, email: fromEmail },
+              to: [{ email: to.trim() }],
+              subject,
+              htmlContent: html,
+            }),
+          });
 
-        const responseText = await response.text();
-        if (!response.ok) {
-          console.error(`[EMAIL ERROR] Brevo API error ${response.status}: ${responseText}`);
-          throw new Error(`Brevo API error ${response.status}: ${responseText}`);
+          const responseText = await response.text();
+          if (!response.ok) {
+            throw new Error(`Brevo API error ${response.status}: ${responseText}`);
+          }
+
+          console.log(`[EMAIL SENT] Brevo API -> to=${to} status=${response.status} (attempt ${attempt})`);
+          return { messageId: `brevo-${Date.now()}`, response: responseText };
+        } catch (err: any) {
+          console.error(`[EMAIL ERROR] Brevo attempt ${attempt}/${MAX_RETRIES} failed: ${err?.message || err}`);
+          if (attempt < MAX_RETRIES) {
+            console.log(`[EMAIL RETRY] Waiting ${RETRY_DELAY_MS}ms before retry...`);
+            await sleep(RETRY_DELAY_MS);
+          }
         }
-
-        console.log(`[EMAIL SENT] Brevo API -> to=${to} status=${response.status}`);
-        return { messageId: `brevo-${Date.now()}`, response: responseText };
-      } catch (err: any) {
-        console.error(`[EMAIL FATAL] Brevo API failed:`, err?.message || err);
       }
+      console.error(`[EMAIL FATAL] Brevo API failed after ${MAX_RETRIES} attempts. Falling back to SMTP...`);
     }
 
-    // 2. SMTP Transporter Fallback
+    // 2. SMTP Transporter Fallback (with retry)
     const transporter = this.getTransporter();
     if (transporter) {
-      console.log(`[EMAIL SENDING] SMTP fallback -> to=${to} subject="${subject}"`);
-      try {
-        const info = await transporter.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to,
-          subject,
-          html,
-        });
-        console.log(`[EMAIL SENT] SMTP -> to=${to} messageId=${info.messageId}`);
-        return info;
-      } catch (err: any) {
-        console.error(`[EMAIL ERROR] SMTP failed:`, err?.message || err);
-        throw err;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          console.log(`[EMAIL SENDING] SMTP attempt ${attempt}/${MAX_RETRIES} -> to=${to} subject="${subject}"`);
+          const info = await transporter.sendMail({
+            from: `"${fromName}" <${fromEmail}>`,
+            to: to.trim(),
+            subject,
+            html,
+          });
+          console.log(`[EMAIL SENT] SMTP -> to=${to} messageId=${info.messageId} (attempt ${attempt})`);
+          return info;
+        } catch (err: any) {
+          console.error(`[EMAIL ERROR] SMTP attempt ${attempt}/${MAX_RETRIES} failed: ${err?.message || err}`);
+          if (attempt < MAX_RETRIES) {
+            console.log(`[EMAIL RETRY] Waiting ${RETRY_DELAY_MS}ms before retry...`);
+            await sleep(RETRY_DELAY_MS);
+          }
+        }
       }
+      console.error(`[EMAIL FATAL] SMTP also failed after ${MAX_RETRIES} attempts for: to=${to} subject="${subject}"`);
     }
 
-    console.warn(`[EMAIL SKIPPED] No transport configured. Would have sent: to=${to} subject="${subject}"`);
+    console.warn(`[EMAIL SKIPPED] No working transport available. Would have sent: to=${to} subject="${subject}"`);
     return { messageId: 'skipped', skipped: true };
   }
 

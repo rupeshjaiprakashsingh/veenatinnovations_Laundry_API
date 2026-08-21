@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsDateString, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsDateString, IsEnum, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -132,6 +132,11 @@ export class UpdatePaymentStatusDto {
   @IsString()
   @IsNotEmpty()
   paymentStatus!: string;
+
+  @ApiProperty({ example: 'Cash', required: false, enum: ['Cash', 'UPI', 'Card', 'Online'] })
+  @IsString()
+  @IsOptional()
+  paymentMode?: string;
 }
 
 export class AssignShopDto {
@@ -164,6 +169,11 @@ export class CreateTimeSlotDto {
   @IsNumber()
   @IsOptional()
   maxCapacity?: number;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class UpdateTimeSlotDto {
@@ -178,6 +188,7 @@ export class UpdateTimeSlotDto {
   maxCapacity?: number;
 
   @ApiProperty({ example: true, required: false })
+  @IsBoolean()
   @IsOptional()
   isActive?: boolean;
 }

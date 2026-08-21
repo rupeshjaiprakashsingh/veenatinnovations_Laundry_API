@@ -231,6 +231,35 @@ export class DeliveryService {
           include: { customer: true, orderItems: { include: { service: true } } },
         });
 
+        // Record Delivered in order status history for timeline
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: delivery.orderId,
+            status: 'Delivered',
+          },
+        });
+
+        // Record Payment if not already recorded
+        const existingPayment = await tx.payment.findFirst({
+          where: { orderId: delivery.orderId },
+        });
+        if (existingPayment) {
+          await tx.payment.update({
+            where: { id: existingPayment.id },
+            data: { paymentStatus: 'Paid', paidDate: new Date() },
+          });
+        } else {
+          await tx.payment.create({
+            data: {
+              orderId: delivery.orderId,
+              amount: order.netAmount,
+              paymentMode: 'Cash',
+              paymentStatus: 'Paid',
+              paidDate: new Date(),
+            },
+          });
+        }
+
         // Trigger SMS & Email notification here: send invoice and order details!
         this.notificationSender.sendInvoiceEmail(
           order.customer.email,
@@ -246,7 +275,6 @@ export class DeliveryService {
           order.customer.mobileNumber,
           `Saimorphix Innovations: Your order #${order.orderNumber} has been delivered successfully. Paid Amount: ₹${order.netAmount}. Thank you!`
         ).catch(err => {
-
           console.error('Invoice delivery SMS failed:', err);
         });
 

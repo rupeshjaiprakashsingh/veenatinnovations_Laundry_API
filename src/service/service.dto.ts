@@ -153,6 +153,16 @@ export class CreateServicePriceDto {
 }
 
 export class UpdateServicePriceDto {
+  @ApiProperty({ example: 3, required: false })
+  @IsNumber()
+  @IsOptional()
+  serviceId?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  productId?: number;
+
   @ApiProperty({ example: "400001", required: false })
   @IsString()
   @IsOptional()

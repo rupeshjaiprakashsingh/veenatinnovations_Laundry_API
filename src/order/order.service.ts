@@ -567,16 +567,37 @@ export class OrderService implements OnModuleInit {
 
     const updated = await this.orderRepository.update(id, { paymentStatus: dto.paymentStatus });
 
-    if (dto.paymentStatus === 'PAID' && order.customer?.email) {
-      this.notificationSender.sendPaymentReceivedEmail(
-        order.customer.email,
-        order.customer.firstName,
-        order.orderNumber,
-        order.netAmount,
-        'Online Payment'
-      ).catch(err => {
-        console.error('Payment confirmation email failed:', err);
-      });
+    const mode = dto.paymentMode || 'Cash';
+    if (dto.paymentStatus === 'Paid' || dto.paymentStatus === 'PAID') {
+      const existingPayment = await this.prisma.payment.findFirst({ where: { orderId: id } });
+      if (existingPayment) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: { paymentMode: mode, paymentStatus: 'Paid', paidDate: new Date() }
+        });
+      } else {
+        await this.prisma.payment.create({
+          data: {
+            orderId: id,
+            amount: order.netAmount,
+            paymentMode: mode,
+            paymentStatus: 'Paid',
+            paidDate: new Date()
+          }
+        });
+      }
+
+      if (order.customer?.email) {
+        this.notificationSender.sendPaymentReceivedEmail(
+          order.customer.email,
+          order.customer.firstName,
+          order.orderNumber,
+          order.netAmount,
+          mode
+        ).catch(err => {
+          console.error('Payment confirmation email failed:', err);
+        });
+      }
     }
 
     return this.enrichOrderWithBillingDetails(updated);
@@ -610,9 +631,17 @@ export class OrderService implements OnModuleInit {
       throw new BadRequestException(`Laundry shop "${shop.shopName}" is not active`);
     }
 
+    // Advance orderStatus to Laundry if still in earlier stages
+    const newStatus = ['New Order', 'Pickup Scheduled', 'Picked Up'].includes(order.orderStatus)
+      ? 'Laundry'
+      : order.orderStatus;
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { laundryShopId: dto.laundryShopId },
+      data: {
+        laundryShopId: dto.laundryShopId,
+        orderStatus: newStatus,
+      },
       include: { laundryShop: true, customer: true },
     });
 
@@ -748,7 +777,7 @@ export class OrderService implements OnModuleInit {
       data: {
         slotName: dto.slotName,
         maxCapacity: dto.maxCapacity ?? 20,
-        isActive: true,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
     });
   }

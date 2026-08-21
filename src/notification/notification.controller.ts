@@ -65,8 +65,8 @@ export class NotificationController {
     let toEmail = (email || '').trim();
     const otpCode = (otp || '1234').trim();
 
-    // Dynamically look up customer profile email by mobile number if email is omitted or invalid
-    if (mobile && (!toEmail || !toEmail.includes('@'))) {
+    // If mobile number is provided, strictly lookup that specific customer from database
+    if (mobile && mobile.trim().length > 0) {
       const cleanMobile = mobile.replace(/[^0-9]/g, '');
       const raw10 = cleanMobile.length >= 10 ? cleanMobile.slice(-10) : cleanMobile;
       const customer = await this.prisma.customer.findFirst({
@@ -78,8 +78,12 @@ export class NotificationController {
           ],
         },
       });
+      // Use email ONLY if it matches the registered customer for this mobile
       if (customer && customer.email && customer.email.includes('@')) {
         toEmail = customer.email.trim();
+      } else {
+        // New user / unregistered mobile: do NOT send email to any mismatched address
+        toEmail = '';
       }
     }
 

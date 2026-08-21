@@ -515,6 +515,42 @@ export class AuthService {
     }
 
     const smsResult = await this.notificationSender.sendOtpSMS(dto.mobileNumber, otpCode);
+
+    // If this mobile number belongs to an existing customer with an email, dispatch backup email to THAT customer's email
+    try {
+      const raw10 = cleanMobile.length >= 10 ? cleanMobile.slice(-10) : cleanMobile;
+      const customer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [
+            { mobileNumber: raw10 },
+            { mobileNumber: `+91${raw10}` },
+            { mobileNumber: `91${raw10}` },
+          ],
+        },
+      });
+      if (customer && customer.email && customer.email.includes('@')) {
+        this.notificationSender.sendEmail(
+          customer.email.trim(),
+          `Your Grivana Login OTP: ${otpCode}`,
+          `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 500px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 15px; border-radius: 8px;">
+              <h2 style="color: #4F46E5; margin: 0; font-size: 20px;">Grivana OTP Verification</h2>
+            </div>
+            <p style="color: #334155; font-size: 14px;">Dear Customer,</p>
+            <p style="color: #475569; font-size: 14px; line-height: 1.5;">Your 4-digit verification code to log in to Grivana Laundry app is:</p>
+            <div style="background-color: #FFFBEB; border: 2px dashed #F59E0B; color: #B45309; text-align: center; font-size: 32px; font-weight: bold; padding: 15px; border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+              ${otpCode}
+            </div>
+            <p style="color: #64748B; font-size: 12px; text-align: center;">This code is valid for 10 minutes. Do not share this OTP with anyone.</p>
+          </div>
+          `
+        ).catch(err => console.error('[AUTH OTP EMAIL ERROR]', err));
+      }
+    } catch (e) {
+      console.error('[AUTH CUSTOMER LOOKUP ERROR]', e);
+    }
+
     return {
       success: true,
       message: `OTP SMS dispatched to ${dto.mobileNumber}. Valid for 10 minutes.`,

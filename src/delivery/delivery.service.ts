@@ -239,21 +239,32 @@ export class DeliveryService {
           },
         });
 
-        // Record Payment if not already recorded
+        // Record Payment with accurate payment mode (preserves Google Pay / UPI if selected on order)
+        let resolvedPaymentMode = dto.paymentMode || 'Cash';
+        if (!dto.paymentMode && order.notes) {
+          if (order.notes.toLowerCase().includes('google pay') || order.notes.toLowerCase().includes('upi') || order.notes.toLowerCase().includes('online')) {
+            resolvedPaymentMode = 'UPI';
+          }
+        }
+
         const existingPayment = await tx.payment.findFirst({
           where: { orderId: delivery.orderId },
         });
         if (existingPayment) {
           await tx.payment.update({
             where: { id: existingPayment.id },
-            data: { paymentStatus: 'Paid', paidDate: new Date() },
+            data: {
+              paymentMode: existingPayment.paymentMode === 'Cash' && resolvedPaymentMode === 'UPI' ? 'UPI' : (dto.paymentMode || existingPayment.paymentMode),
+              paymentStatus: 'Paid',
+              paidDate: new Date(),
+            },
           });
         } else {
           await tx.payment.create({
             data: {
               orderId: delivery.orderId,
               amount: order.netAmount,
-              paymentMode: 'Cash',
+              paymentMode: resolvedPaymentMode,
               paymentStatus: 'Paid',
               paidDate: new Date(),
             },

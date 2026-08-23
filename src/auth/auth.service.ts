@@ -452,12 +452,16 @@ export class AuthService {
 
   async phoneLogin(dto: PhoneLoginDto) {
     const { mobileNumber } = dto;
+    const clean = (mobileNumber || '').replace(/\D/g, '');
+    const raw10 = clean.length >= 10 ? clean.slice(-10) : clean;
 
     const customer = await this.prisma.customer.findFirst({
       where: {
         OR: [
+          { mobileNumber: raw10 },
+          { mobileNumber: `+91${raw10}` },
+          { mobileNumber: `91${raw10}` },
           { mobileNumber },
-          { mobileNumber: mobileNumber.startsWith('+91') ? mobileNumber.slice(3) : `+91${mobileNumber}` }
         ]
       },
     });

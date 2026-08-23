@@ -38,4 +38,9 @@ export class UpdateDeliveryStatusDto {
   @IsString()
   @IsOptional()
   deliveryOtp?: string;
+
+  @ApiProperty({ example: 'UPI', required: false })
+  @IsString()
+  @IsOptional()
+  paymentMode?: string;
 }

@@ -28,10 +28,38 @@ export class PickupService {
   }
 
   async findAll() {
-    return this.pickupRepository.findAll({
+    const pickups = await this.pickupRepository.findAll({
       include: { customer: true, assignedEmployee: true },
       orderBy: { pickupDate: 'desc' },
     });
+
+    const enrichedPickups = await Promise.all(
+      pickups.map(async (pickup) => {
+        const activeOrder = await this.prisma.order.findFirst({
+          where: {
+            customerId: pickup.customerId,
+            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up'] },
+          },
+          include: { laundryShop: true },
+          orderBy: { id: 'desc' },
+        });
+
+        return {
+          ...pickup,
+          order: activeOrder
+            ? {
+                id: activeOrder.id,
+                orderNumber: activeOrder.orderNumber,
+                netAmount: activeOrder.netAmount,
+                paymentStatus: activeOrder.paymentStatus,
+                laundryShop: activeOrder.laundryShop,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return enrichedPickups;
   }
 
   async findOne(id: number) {

@@ -104,8 +104,9 @@ export class OrderController {
   getAvailableSlots(
     @Query('date') date?: string,
     @Query('pincode') pincode?: string,
+    @Query('isPriority') isPriority?: string,
   ) {
-    return this.orderService.getAvailableSlots(date, pincode);
+    return this.orderService.getAvailableSlots(date, pincode, isPriority);
   }
 
   @Get('time-slots/admin')

@@ -242,7 +242,10 @@ export class DeliveryService {
         // Record Payment with accurate payment mode (preserves Google Pay / UPI if selected on order)
         let resolvedPaymentMode = dto.paymentMode || 'Cash';
         if (!dto.paymentMode && order.notes) {
-          if (order.notes.toLowerCase().includes('google pay') || order.notes.toLowerCase().includes('upi') || order.notes.toLowerCase().includes('online')) {
+          const notesLower = order.notes.toLowerCase();
+          if (notesLower.includes('gpay') || notesLower.includes('google pay')) {
+            resolvedPaymentMode = 'GPay';
+          } else if (notesLower.includes('upi') || notesLower.includes('online')) {
             resolvedPaymentMode = 'UPI';
           }
         }
@@ -254,7 +257,7 @@ export class DeliveryService {
           await tx.payment.update({
             where: { id: existingPayment.id },
             data: {
-              paymentMode: existingPayment.paymentMode === 'Cash' && resolvedPaymentMode === 'UPI' ? 'UPI' : (dto.paymentMode || existingPayment.paymentMode),
+              paymentMode: dto.paymentMode || (existingPayment.paymentMode === 'Cash' && resolvedPaymentMode !== 'Cash' ? resolvedPaymentMode : existingPayment.paymentMode),
               paymentStatus: 'Paid',
               paidDate: new Date(),
             },

@@ -135,8 +135,15 @@ export class OrderService implements OnModuleInit {
     const orderCount = await this.prisma.order.count({ where: { customerId } });
     const isFirstOrder = orderCount === 0;
 
-    const deliveryCharge = isFirstOrder ? 0.0 : 20.0;
-    const freeDeliverySaving = isFirstOrder ? 20.0 : 0.0;
+    const isPriorityOrder = resolvedItems.some(item => {
+      const sName = (item.serviceName || '').toLowerCase();
+      const sType = (item.serviceType || '').toLowerCase();
+      return sName.includes('priority') || sType.includes('priority');
+    }) || (createOrderDto.notes && createOrderDto.notes.toLowerCase().includes('priority'));
+
+    // Grivana Priority delivery fee is fixed at ₹30.00; standard delivery is ₹20 (free on first order)
+    const deliveryCharge = isPriorityOrder ? 30.0 : (isFirstOrder ? 0.0 : 20.0);
+    const freeDeliverySaving = (!isPriorityOrder && isFirstOrder) ? 20.0 : 0.0;
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
@@ -215,6 +222,7 @@ export class OrderService implements OnModuleInit {
       finalPayable,
       totalSavings: parseFloat(totalSavings.toFixed(2)),
       resolvedItems,
+      isPriorityOrder,
     };
   }
 
@@ -230,6 +238,76 @@ export class OrderService implements OnModuleInit {
 
     if (orderItems.length === 0) {
       throw new BadRequestException('Order must contain at least one service item');
+    }
+
+    // Call unified calculation
+    const bill = await this.calculateOrderBillDetails(createOrderDto);
+
+    // Grivana Priority Business Logic Checks
+    if (bill.isPriorityOrder) {
+      // 1. Validate Time Slot - Must be Before 11 AM
+      let slotString = '';
+      if (notes && notes.includes('Slot:')) {
+        const slotPart = notes.split('|').find(p => p.includes('Slot:'));
+        if (slotPart) {
+          slotString = slotPart.replace('Slot:', '').trim();
+        }
+      }
+
+      if (slotString) {
+        const slotLower = slotString.toLowerCase();
+        const isAfter11 =
+          slotLower.includes('11 am - 12 pm') ||
+          slotLower.includes('12 pm') ||
+          slotLower.includes('1 pm') ||
+          slotLower.includes('2 pm') ||
+          slotLower.includes('3 pm') ||
+          slotLower.includes('4 pm') ||
+          slotLower.includes('5 pm') ||
+          slotLower.includes('6 pm') ||
+          slotLower.includes('7 pm') ||
+          slotLower.includes('8 pm') ||
+          slotLower.includes('9 pm');
+
+        if (isAfter11) {
+          throw new BadRequestException(
+            'Grivana Priority pickups are only available for morning slots before 11:00 AM (e.g. 8 AM - 9 AM, 9 AM - 10 AM, 10 AM - 11 AM). Please select a morning slot before 11 AM.'
+          );
+        }
+      }
+
+      // 2. Validate Daily Capping of 25 Orders
+      const targetPickup = pickupDate ? new Date(pickupDate) : new Date();
+      const startOfDay = new Date(targetPickup);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetPickup);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const existingPriorityCount = await this.prisma.order.count({
+        where: {
+          pickupDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          orderItems: {
+            some: {
+              service: {
+                OR: [
+                  { serviceName: { contains: 'Priority', mode: 'insensitive' } },
+                  { serviceType: { contains: 'Priority', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+          orderStatus: { notIn: ['Cancelled'] },
+        },
+      });
+
+      if (existingPriorityCount >= 25) {
+        throw new BadRequestException(
+          'Daily limit of 25 Grivana Priority orders has been reached for this date. Please choose another date or standard service.'
+        );
+      }
     }
 
     // Resolve address fields for order snapshot
@@ -276,9 +354,6 @@ export class OrderService implements OnModuleInit {
         houseDetails = customer.houseDetails ?? null;
       }
     }
-
-    // Call unified calculation
-    const bill = await this.calculateOrderBillDetails(createOrderDto);
 
     // Build items to create
     const itemsToCreate = bill.resolvedItems.map(item => ({
@@ -721,19 +796,69 @@ export class OrderService implements OnModuleInit {
 
   // ── TIME SLOT MANAGEMENT METHODS ──
 
-  async getAvailableSlots(date?: string, pincode?: string) {
+  async getAvailableSlots(date?: string, pincode?: string, isPriority?: boolean | string) {
     const targetDate = date ? new Date(date) : new Date();
-    
+    const priorityMode = isPriority === true || isPriority === 'true';
+
     // Set start of day and end of day in UTC
     const startOfDay = new Date(targetDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(targetDate);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
-    const slots = await this.prisma.timeSlot.findMany({
+    let slots = await this.prisma.timeSlot.findMany({
       where: { isActive: true },
       orderBy: { id: 'asc' },
     });
+
+    if (priorityMode) {
+      // For Grivana Priority, only slots BEFORE 11 AM are valid
+      slots = slots.filter(s => {
+        const name = s.slotName.toLowerCase();
+        return (
+          name.includes('8 am - 9 am') ||
+          name.includes('9 am - 10 am') ||
+          name.includes('10 am - 11 am') ||
+          name.includes('before 11 am') ||
+          name.includes('6 am - 8 am') ||
+          name.includes('7 am - 9 am') ||
+          name.includes('8 am - 10 am') ||
+          name.includes('9 am - 11 am')
+        );
+      });
+
+      // Check 25 Orders Daily Capping for Grivana Priority
+      const priorityOrdersCount = await this.prisma.order.count({
+        where: {
+          pickupDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          orderItems: {
+            some: {
+              service: {
+                OR: [
+                  { serviceName: { contains: 'Priority', mode: 'insensitive' } },
+                  { serviceType: { contains: 'Priority', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+          orderStatus: { notIn: ['Cancelled'] },
+        },
+      });
+
+      const isDailyCapReached = priorityOrdersCount >= 25;
+
+      return slots.map(slot => ({
+        id: slot.id,
+        slotName: slot.slotName,
+        maxCapacity: 25,
+        bookedCount: priorityOrdersCount,
+        isFull: isDailyCapReached,
+        isPriority: true,
+      }));
+    }
 
     const result: any[] = [];
     for (const slot of slots) {

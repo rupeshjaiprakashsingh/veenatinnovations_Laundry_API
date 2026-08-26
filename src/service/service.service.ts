@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ServiceRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
@@ -11,11 +11,39 @@ import {
 } from './service.dto';
 
 @Injectable()
-export class ServiceService {
+export class ServiceService implements OnModuleInit {
   constructor(
     private readonly serviceRepository: ServiceRepository,
     private readonly prisma: PrismaService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const existing = await this.prisma.service.findFirst({
+        where: {
+          OR: [
+            { serviceName: { contains: 'Priority', mode: 'insensitive' } },
+            { serviceType: { contains: 'Priority', mode: 'insensitive' } },
+          ],
+        },
+      });
+      if (!existing) {
+        await this.prisma.service.create({
+          data: {
+            serviceName: 'Grivana Priority',
+            serviceType: 'Grivana Priority',
+            price: 30.0,
+            description: 'Express Priority Service with morning pickup before 11 AM, ₹30 delivery fee, and daily cap of 25 orders.',
+            estimatedHours: 12,
+            isActive: true,
+          },
+        });
+        console.log('[ServiceService] Seeded default Grivana Priority service.');
+      }
+    } catch (err: any) {
+      console.warn('[ServiceService] Error initializing Grivana Priority service:', err?.message);
+    }
+  }
 
   async create(createServiceDto: CreateServiceDto) {
     return this.serviceRepository.create(createServiceDto);
@@ -93,6 +121,7 @@ export class ServiceService {
 
     const getCategoryPriority = (serviceType: string, serviceName: string) => {
       const typeStr = ((serviceType || '') + ' ' + (serviceName || '')).toLowerCase();
+      if (typeStr.includes('priority')) return 0;
       if (typeStr.includes('iron') || typeStr.includes('press') || typeStr.includes('steam')) return 1;
       if (typeStr.includes('wash') || typeStr.includes('laundry')) return 2;
       if (typeStr.includes('dry')) return 3;

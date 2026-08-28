@@ -19,29 +19,82 @@ export class ServiceService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      const existing = await this.prisma.service.findFirst({
-        where: {
-          OR: [
-            { serviceName: { contains: 'Priority', mode: 'insensitive' } },
-            { serviceType: { contains: 'Priority', mode: 'insensitive' } },
-          ],
+      // 1. Seed Core Services
+      const defaultServices = [
+        {
+          serviceName: 'Steam Press',
+          serviceType: 'Press / Ironing',
+          price: 15.0,
+          description: 'Professional wrinkle-free steam pressing & ironing.',
+          estimatedHours: 24,
+          isActive: true,
         },
-      });
-      if (!existing) {
-        await this.prisma.service.create({
-          data: {
-            serviceName: 'Grivana Priority',
-            serviceType: 'Grivana Priority',
-            price: 30.0,
-            description: 'Express Priority Service with morning pickup before 11 AM, ₹30 delivery fee, and daily cap of 25 orders.',
-            estimatedHours: 12,
-            isActive: true,
+        {
+          serviceName: 'Dry Cleaning',
+          serviceType: 'Dry Cleaning',
+          price: 100.0,
+          description: 'Eco-friendly premium dry cleaning for delicate garments.',
+          estimatedHours: 48,
+          isActive: true,
+        },
+        {
+          serviceName: 'Grivana Priority',
+          serviceType: 'Grivana Priority',
+          price: 30.0,
+          description: 'Express Priority Service with morning pickup before 11 AM, ₹30 delivery fee, and daily cap of 25 orders.',
+          estimatedHours: 12,
+          isActive: true,
+        },
+        {
+          serviceName: 'Standard Washing',
+          serviceType: 'Washing',
+          price: 40.0,
+          description: 'Hygienic wash and fold for everyday laundry.',
+          estimatedHours: 24,
+          isActive: true,
+        },
+      ];
+
+      for (const s of defaultServices) {
+        const existing = await this.prisma.service.findFirst({
+          where: {
+            OR: [
+              { serviceName: { contains: s.serviceName, mode: 'insensitive' } },
+              { serviceType: { contains: s.serviceType, mode: 'insensitive' } },
+            ],
           },
         });
-        console.log('[ServiceService] Seeded default Grivana Priority service.');
+        if (!existing) {
+          await this.prisma.service.create({ data: s });
+          console.log(`[ServiceService] Seeded default service: ${s.serviceName}`);
+        } else if (!existing.isActive) {
+          await this.prisma.service.update({ where: { id: existing.id }, data: { isActive: true } });
+        }
+      }
+
+      // 2. Seed Standard Products if none exist
+      const defaultProducts = [
+        { name: 'Shirt', emoji: '👔' },
+        { name: 'Pant', emoji: '👖' },
+        { name: 'T-Shirt', emoji: '👕' },
+        { name: 'Saree', emoji: '🥻' },
+        { name: 'Suit / Blazer', emoji: '🧥' },
+        { name: 'Kurta', emoji: '👘' },
+        { name: 'Bedsheet', emoji: '🛏️' },
+        { name: 'Curtain', emoji: '🪟' },
+      ];
+
+      for (const p of defaultProducts) {
+        const existingProd = await this.prisma.product.findFirst({
+          where: { name: { equals: p.name, mode: 'insensitive' } }
+        });
+        if (!existingProd) {
+          await this.prisma.product.create({ data: { name: p.name, emoji: p.emoji, isActive: true } });
+          console.log(`[ServiceService] Seeded default product: ${p.name}`);
+        }
       }
     } catch (err: any) {
-      console.warn('[ServiceService] Error initializing Grivana Priority service:', err?.message);
+      console.warn('[ServiceService] Error initializing services/products:', err?.message);
     }
   }
 
@@ -89,14 +142,11 @@ export class ServiceService implements OnModuleInit {
     return this.serviceRepository.delete(id);
   }
 
-  // Dynamic Pricing Method — only returns services/products with prices
-  // configured for the EXACT pincode in the Admin Panel Pricing table.
-  // If no pincode is provided or no prices exist for that pincode, returns empty.
+  // Dynamic Pricing Method — returns services/products with prices
+  // configured for the EXACT pincode in the Admin Panel Pricing table,
+  // falling back to DEFAULT prices or service basePrice.
   async getPricing(pincode?: string) {
-    const targetPincode = pincode && pincode.trim().length > 0 ? pincode.trim() : null;
-
-    // If no pincode provided, return empty — user must have a pincode set
-    if (!targetPincode) return [];
+    const targetPincode = pincode && pincode.trim().length > 0 ? pincode.trim().toUpperCase() : 'DEFAULT';
 
     const services = await this.prisma.service.findMany({
       where: { isActive: true },
@@ -108,23 +158,23 @@ export class ServiceService implements OnModuleInit {
       orderBy: { id: 'asc' },
     });
 
-    // Only fetch prices for the EXACT pincode from Admin Panel — no DEFAULT fallback
+    // Fetch prices for the target pincode AND DEFAULT
     const prices = await this.prisma.servicePrice.findMany({
       where: {
         isActive: true,
-        pincode: targetPincode,
-      }
+        OR: [
+          { pincode: targetPincode },
+          { pincode: 'DEFAULT' },
+        ],
+      },
     });
-
-    // If no prices exist for this pincode at all, return empty
-    if (prices.length === 0) return [];
 
     const getCategoryPriority = (serviceType: string, serviceName: string) => {
       const typeStr = ((serviceType || '') + ' ' + (serviceName || '')).toLowerCase();
       if (typeStr.includes('priority')) return 0;
       if (typeStr.includes('iron') || typeStr.includes('press') || typeStr.includes('steam')) return 1;
-      if (typeStr.includes('wash') || typeStr.includes('laundry')) return 2;
-      if (typeStr.includes('dry')) return 3;
+      if (typeStr.includes('dry')) return 2;
+      if (typeStr.includes('wash') || typeStr.includes('laundry')) return 3;
       return 4;
     };
 
@@ -132,13 +182,27 @@ export class ServiceService implements OnModuleInit {
       .sort((a, b) => getCategoryPriority(a.serviceType, a.serviceName) - getCategoryPriority(b.serviceType, b.serviceName))
       .map(service => {
         const serviceProducts = products.map(product => {
-          const matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
+          const matchedPrice =
+            prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode) ||
+            prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
+
+          // Fallback base pricing per service category if specific product price is not explicitly configured
+          let fallbackPrice = service.price > 0 ? service.price : null;
+          if (!fallbackPrice) {
+            const sLower = (service.serviceName + ' ' + service.serviceType).toLowerCase();
+            if (sLower.includes('iron') || sLower.includes('press')) fallbackPrice = 15.0;
+            else if (sLower.includes('dry')) fallbackPrice = 100.0;
+            else if (sLower.includes('priority')) fallbackPrice = 30.0;
+            else if (sLower.includes('wash')) fallbackPrice = 40.0;
+          }
+
+          const finalPrice = matchedPrice ? matchedPrice.price : fallbackPrice;
 
           return {
             id: product.id,
             name: product.name,
             emoji: product.emoji,
-            price: matchedPrice ? matchedPrice.price : null,
+            price: finalPrice,
             category: service.serviceName
           };
         }).filter(p => p.price !== null);
@@ -147,7 +211,7 @@ export class ServiceService implements OnModuleInit {
           id: service.id,
           serviceName: service.serviceName,
           serviceType: service.serviceType,
-          basePrice: service.price,
+          basePrice: service.price > 0 ? service.price : 15.0,
           description: service.description,
           estimatedHours: service.estimatedHours,
           image: service.image,
@@ -156,7 +220,6 @@ export class ServiceService implements OnModuleInit {
           products: serviceProducts
         };
       })
-      // Only return services that actually have products with prices configured
       .filter(s => s.products.length > 0);
   }
 

@@ -682,6 +682,9 @@ export class OrderService implements OnModuleInit {
     const orders = await this.orderRepository.findAll({
       where: { customerId },
       include: {
+        customer: true,
+        branch: true,
+        laundryShop: true,
         orderItems: { include: { service: true } },
         payments: true,
         deliveries: true,

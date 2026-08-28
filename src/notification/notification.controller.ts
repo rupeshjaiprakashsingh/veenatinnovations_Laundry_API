@@ -114,7 +114,7 @@ export class NotificationController {
       }
 
       if (mobile) {
-        await this.notificationSender.sendSMS(mobile, `Grivana Laundry: Your 4-digit OTP is ${otpCode}. Valid for 10 minutes.`);
+        await this.notificationSender.sendOtpSMS(mobile, otpCode);
       }
 
       return {

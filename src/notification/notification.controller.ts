@@ -59,6 +59,28 @@ export class NotificationController {
   }
 
   @Public()
+  @Post('send-qa-report')
+  @ApiOperation({ summary: 'Send QA Validation Report Email (Public)' })
+  async sendQaReport(@Body() body: { toEmail: string; subject: string; html: string }) {
+    const toEmail = (body.toEmail || 'rupeshsingh7208@gmail.com').trim();
+    const subject = body.subject || 'QA Validation Report - Grivana Laundry Application';
+    try {
+      const info = await this.notificationSender.sendEmail(toEmail, subject, body.html);
+      return {
+        success: true,
+        message: `QA validation report sent successfully to ${toEmail}`,
+        messageId: info?.messageId,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Failed to send QA report to ${toEmail}`,
+        error: err.message || err,
+      };
+    }
+  }
+
+  @Public()
   @Get('send-otp')
   @ApiOperation({ summary: 'Send 4-digit OTP email & SMS to customer (Public)' })
   async sendOtp(@Query('email') email: string, @Query('otp') otp: string, @Query('mobile') mobile: string) {
@@ -167,7 +189,7 @@ export class NotificationController {
       results['4_OrderStatusOutForDelivery'] = 'Sent';
 
       // 5. Delivery OTP Email
-      await this.notificationSender.sendDeliveryOtp(targetEmail, '918433711031', name, orderNumber, '4928');
+      await this.notificationSender.sendDeliveryOtp(targetEmail, '918369812313', name, orderNumber, '4928');
       results['5_DeliveryOtp'] = 'Sent';
 
       // 6. Payment Confirmation Email

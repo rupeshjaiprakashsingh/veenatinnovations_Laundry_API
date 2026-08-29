@@ -330,6 +330,7 @@ export class NotificationSenderService {
       </div>
     `;
     await this.sendEmail(toEmail, 'Delivery OTP Verification', html);
+    await this.sendOtpSMS(toMobile, otp);
     await this.sendSMS(toMobile, `Saimorphix Innovations: Use OTP ${otp} to verify delivery of order #${orderNumber}. Do not share this OTP.`);
   }
 

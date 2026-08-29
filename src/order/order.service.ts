@@ -141,9 +141,9 @@ export class OrderService implements OnModuleInit {
       return sName.includes('priority') || sType.includes('priority');
     }) || (createOrderDto.notes && createOrderDto.notes.toLowerCase().includes('priority'));
 
-    // Grivana Priority delivery fee is fixed at ₹30.00; standard delivery is ₹20 (free on first order)
-    const deliveryCharge = isPriorityOrder ? 30.0 : (isFirstOrder ? 0.0 : 20.0);
-    const freeDeliverySaving = (!isPriorityOrder && isFirstOrder) ? 20.0 : 0.0;
+    // Universal Delivery Rule: Below 10 clothes – delivery will be charged ₹30.00; 10 or more clothes – delivery is FREE (₹0.00)
+    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 30.0;
+    const freeDeliverySaving = totalQuantity >= 10 ? 30.0 : 0.0;
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
@@ -519,20 +519,8 @@ export class OrderService implements OnModuleInit {
       ? order.orderItems.reduce((sum: number, item: any) => sum + item.quantity, 0)
       : 0;
     
-    let deliveryCharge = 20.0;
-    if (order.notes) {
-      if (order.notes.includes('Delivery: Free (First Order)')) {
-        deliveryCharge = 0.0;
-      } else if (order.notes.includes('Delivery: Paid')) {
-        deliveryCharge = 20.0;
-      } else {
-        // Fallback for legacy orders
-        deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
-      }
-    } else {
-      deliveryCharge = totalQuantity >= 10 ? 0.0 : 20.0;
-    }
-    const freeDeliverySaving = deliveryCharge === 0.0 ? 20.0 : 0.0;
+    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 30.0;
+    const freeDeliverySaving = totalQuantity >= 10 ? 30.0 : 0.0;
 
     // Reconstruct insurance charge
     const reconstructedInsurance = netAmount - subtotal - taxAmount - platformFee - deliveryCharge + discountAmount;

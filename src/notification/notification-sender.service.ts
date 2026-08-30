@@ -158,10 +158,14 @@ export class NotificationSenderService {
     const password = (process.env.SMS_PASSWORD || 'India@2026').trim();
     const senderId = (process.env.SMS_SENDER_ID || 'SMORPH').trim();
 
-    // Ensure 10-digit mobile number has 91 country code prefix
+    // Ensure mobile number is cleaned and properly prefixed with country code 91
     let cleanMobile = (mobileNumber || '').replace(/\D/g, '');
     if (cleanMobile.length === 10) {
       cleanMobile = '91' + cleanMobile;
+    } else if (cleanMobile.length === 11 && cleanMobile.startsWith('0')) {
+      cleanMobile = '91' + cleanMobile.slice(1);
+    } else if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
+      // already proper 91XXXXXXXXXX
     }
 
     const entityId = (process.env.SMS_ENTITY_ID || '').trim();

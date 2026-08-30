@@ -17,8 +17,8 @@ export class LaundryShopController {
   constructor(private readonly laundryShopService: LaundryShopService) {}
 
   @Post()
-  @Roles('SuperAdmin', 'DeliveryBoy')
-  @ApiOperation({ summary: 'Create a new laundry shop (SuperAdmin and DeliveryBoy)' })
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Create a new laundry shop (SuperAdmin, BranchManager, Employee, and DeliveryBoy)' })
   @ApiResponse({ status: 201, description: 'Laundry shop created successfully' })
   create(@Body() dto: CreateLaundryShopDto) {
     return this.laundryShopService.create(dto);

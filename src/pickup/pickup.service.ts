@@ -155,26 +155,42 @@ export class PickupService {
 
     const enrichedPickups = await Promise.all(
       pickups.map(async (pickup) => {
-        const activeOrder = await this.prisma.order.findFirst({
+        let activeOrder = await this.prisma.order.findFirst({
           where: {
             customerId: pickup.customerId,
-            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up'] },
+            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
           },
           include: { laundryShop: true },
           orderBy: { id: 'desc' },
         });
+
+        if (!activeOrder) {
+          activeOrder = await this.prisma.order.findFirst({
+            where: { customerId: pickup.customerId },
+            include: { laundryShop: true },
+            orderBy: { id: 'desc' },
+          });
+        }
+
+        const generatedOrderNumber = `ORD-${String(pickup.id).padStart(5, '0')}`;
 
         return {
           ...pickup,
           order: activeOrder
             ? {
                 id: activeOrder.id,
-                orderNumber: activeOrder.orderNumber,
+                orderNumber: activeOrder.orderNumber || generatedOrderNumber,
                 netAmount: activeOrder.netAmount,
                 paymentStatus: activeOrder.paymentStatus,
                 laundryShop: activeOrder.laundryShop,
               }
-            : null,
+            : {
+                id: pickup.id,
+                orderNumber: generatedOrderNumber,
+                netAmount: 0,
+                paymentStatus: 'Pending',
+                laundryShop: null,
+              },
         };
       }),
     );

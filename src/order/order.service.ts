@@ -542,6 +542,15 @@ export class OrderService implements OnModuleInit {
     const exactNet = grossTotal - discountAmount;
     const roundOff = parseFloat((netAmount - exactNet).toFixed(2));
 
+    // Extract active delivery OTP if generated
+    let deliveryOtp: string | undefined = undefined;
+    if (order.deliveries && Array.isArray(order.deliveries)) {
+      const activeDelivery = order.deliveries.find((d: any) => d.deliveryOtp);
+      if (activeDelivery) {
+        deliveryOtp = activeDelivery.deliveryOtp;
+      }
+    }
+
     return {
       ...order,
       platformFee,
@@ -552,6 +561,8 @@ export class OrderService implements OnModuleInit {
       roundOff,
       finalPayable: netAmount,
       totalSavings: parseFloat(totalSavings.toFixed(2)),
+      deliveryOtp,
+      latestDeliveryOtp: deliveryOtp,
     };
   }
 

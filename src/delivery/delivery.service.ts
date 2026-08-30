@@ -347,8 +347,10 @@ export class DeliveryService {
     });
 
     return {
-      message: 'Delivery verification OTP has been sent to the customer.',
-      otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      message: `Delivery verification OTP has been sent to customer ${order.customer.firstName} on mobile (${order.customer.mobileNumber}) and email (${order.customer.email}).`,
+      otp: otp,
+      customerMobile: order.customer.mobileNumber,
+      customerEmail: order.customer.email,
     };
   }
 

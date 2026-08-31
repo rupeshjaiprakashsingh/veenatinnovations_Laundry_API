@@ -15,8 +15,17 @@ async function bootstrap() {
   });
 
   // Security Middlewares & Static File Access
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(helmet({ 
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false
+  }));
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+
+  const adminDist = join(process.cwd(), 'public', 'admin');
+  app.use('/admin', express.static(adminDist));
+  app.use('/admin/*', (req: express.Request, res: express.Response) => {
+    res.sendFile(join(adminDist, 'index.html'));
+  });
   
   // CORS configuration
   app.enableCors({

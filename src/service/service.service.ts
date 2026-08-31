@@ -169,6 +169,9 @@ export class ServiceService implements OnModuleInit {
       },
     });
 
+    const hasPincodePrices = targetPincode !== 'DEFAULT' && prices.some(p => p.pincode === targetPincode);
+    const hasDefaultPrices = prices.some(p => p.pincode === 'DEFAULT');
+
     const getCategoryPriority = (serviceType: string, serviceName: string) => {
       const typeStr = ((serviceType || '') + ' ' + (serviceName || '')).toLowerCase();
       if (typeStr.includes('priority')) return 0;
@@ -182,36 +185,33 @@ export class ServiceService implements OnModuleInit {
       .sort((a, b) => getCategoryPriority(a.serviceType, a.serviceName) - getCategoryPriority(b.serviceType, b.serviceName))
       .map(service => {
         const serviceProducts = products.map(product => {
-          const matchedPrice =
-            prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode) ||
-            prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
-
-          // Fallback base pricing per service category if specific product price is not explicitly configured
-          let fallbackPrice = service.price > 0 ? service.price : null;
-          if (!fallbackPrice) {
-            const sLower = (service.serviceName + ' ' + service.serviceType).toLowerCase();
-            if (sLower.includes('iron') || sLower.includes('press')) fallbackPrice = 15.0;
-            else if (sLower.includes('dry')) fallbackPrice = 100.0;
-            else if (sLower.includes('priority')) fallbackPrice = 30.0;
-            else if (sLower.includes('wash')) fallbackPrice = 40.0;
+          let matchedPrice: any = null;
+          if (hasPincodePrices) {
+            // Strict match for this pincode only
+            matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === targetPincode);
+          } else if (hasDefaultPrices) {
+            // Fallback to DEFAULT prices only if this pincode has no specific pricing configured
+            matchedPrice = prices.find(p => p.serviceId === service.id && p.productId === product.id && p.pincode === 'DEFAULT');
           }
 
-          const finalPrice = matchedPrice ? matchedPrice.price : fallbackPrice;
+          if (!matchedPrice) {
+            return null; // Product is not priced/available for this pincode
+          }
 
           return {
             id: product.id,
             name: product.name,
             emoji: product.emoji,
-            price: finalPrice,
+            price: matchedPrice.price,
             category: service.serviceName
           };
-        }).filter(p => p.price !== null);
+        }).filter(p => p !== null);
 
         return {
           id: service.id,
           serviceName: service.serviceName,
           serviceType: service.serviceType,
-          basePrice: service.price > 0 ? service.price : 15.0,
+          basePrice: service.price > 0 ? service.price : (serviceProducts[0] ? (serviceProducts[0] as any).price : 15.0),
           description: service.description,
           estimatedHours: service.estimatedHours,
           image: service.image,

@@ -23,8 +23,14 @@ async function bootstrap() {
 
   const adminDist = join(process.cwd(), 'public', 'admin');
   app.use('/admin', express.static(adminDist));
-  app.use('/admin/*', (req: express.Request, res: express.Response) => {
-    res.sendFile(join(adminDist, 'index.html'));
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.path === '/' || req.path === '') {
+      return res.redirect('/admin');
+    }
+    if (req.path.startsWith('/admin') && !req.path.startsWith('/api')) {
+      return res.sendFile(join(adminDist, 'index.html'));
+    }
+    next();
   });
   
   // CORS configuration

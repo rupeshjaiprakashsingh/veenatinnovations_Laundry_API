@@ -4,6 +4,7 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as express from 'express';
+import * as fs from 'fs';
 import { join } from 'path';
 import { winstonLogger } from './common/logger/winston.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -19,16 +20,28 @@ async function bootstrap() {
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: false
   }));
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsDir));
 
   const adminDist = join(process.cwd(), 'public', 'admin');
-  app.use('/admin', express.static(adminDist));
+  const indexHtmlPath = join(adminDist, 'index.html');
+
+  if (fs.existsSync(adminDist)) {
+    app.use('/admin', express.static(adminDist));
+  }
+
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (req.path === '/' || req.path === '') {
       return res.redirect('/admin');
     }
     if (req.path.startsWith('/admin') && !req.path.startsWith('/api')) {
-      return res.sendFile(join(adminDist, 'index.html'));
+      if (fs.existsSync(indexHtmlPath)) {
+        return res.sendFile(indexHtmlPath);
+      }
     }
     next();
   });

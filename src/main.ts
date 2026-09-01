@@ -28,19 +28,21 @@ async function bootstrap() {
   app.use('/uploads', express.static(uploadsDir));
 
   const adminDist = join(process.cwd(), 'public', 'admin');
-  const indexHtmlPath = join(adminDist, 'index.html');
+  const adminIndexHtml = join(adminDist, 'index.html');
 
   if (fs.existsSync(adminDist)) {
     app.use('/admin', express.static(adminDist));
   }
 
+  const publicDir = join(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+  }
+
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (req.path === '/' || req.path === '') {
-      return res.redirect('/admin');
-    }
     if (req.path.startsWith('/admin') && !req.path.startsWith('/api')) {
-      if (fs.existsSync(indexHtmlPath)) {
-        return res.sendFile(indexHtmlPath);
+      if (fs.existsSync(adminIndexHtml)) {
+        return res.sendFile(adminIndexHtml);
       }
     }
     next();

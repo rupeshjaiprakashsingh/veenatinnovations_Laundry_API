@@ -109,6 +109,21 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   houseDetails?: string;
+
+  @ApiProperty({ example: 'Grivana Credits', required: false })
+  @IsString()
+  @IsOptional()
+  paymentMode?: string;
+
+  @ApiProperty({ example: 255.50, required: false })
+  @IsNumber()
+  @IsOptional()
+  paidAmount?: number;
+
+  @ApiProperty({ example: 'CREDIT-123456789', required: false })
+  @IsString()
+  @IsOptional()
+  transactionReference?: string;
 }
 
 export class UpdateOrderStatusDto {

@@ -433,6 +433,59 @@ export class OrderService implements OnModuleInit {
         orderNotes += ` | Coupon Code Applied: ${bill.couponCode}`;
       }
 
+      // Determine initial payment status and payment details
+      let initialPaymentStatus = 'Pending';
+      let resolvedPaymentMode = createOrderDto.paymentMode;
+      let resolvedPaidAmount = createOrderDto.paidAmount;
+      let resolvedTxnRef = createOrderDto.transactionReference;
+
+      // Also inspect orderNotes for credit deduction or instant payment
+      if (!resolvedPaymentMode && orderNotes) {
+        if (orderNotes.includes('Grivana Credits (100% Covered)') || orderNotes.includes('Payment Mode: Grivana Credits')) {
+          resolvedPaymentMode = 'Grivana Credits';
+          resolvedPaidAmount = bill.finalPayable;
+        } else if (orderNotes.includes('Payment Mode: GPay') || orderNotes.includes('Payment Mode: Google Pay')) {
+          resolvedPaymentMode = 'Google Pay / UPI';
+          resolvedPaidAmount = bill.finalPayable;
+        }
+      }
+
+      if (resolvedPaidAmount === undefined || resolvedPaidAmount === null) {
+        if (orderNotes) {
+          const creditMatch = orderNotes.match(/Grivana Credits Applied:\s*Rs\.\s*([\d.]+)/i);
+          if (creditMatch) {
+            const parsedCredits = parseFloat(creditMatch[1]);
+            if (!isNaN(parsedCredits) && parsedCredits > 0) {
+              resolvedPaidAmount = parsedCredits;
+              if (!resolvedPaymentMode) resolvedPaymentMode = 'Grivana Credits';
+            }
+          }
+        }
+      }
+
+      if (!resolvedTxnRef && orderNotes) {
+        const txnMatch = orderNotes.match(/Txn Ref:\s*([^\s|]+)/i);
+        if (txnMatch) {
+          resolvedTxnRef = txnMatch[1].trim();
+        }
+      }
+
+      let paymentToCreate: any = null;
+      if (resolvedPaidAmount !== undefined && resolvedPaidAmount !== null && resolvedPaidAmount > 0) {
+        if (resolvedPaidAmount >= bill.finalPayable) {
+          initialPaymentStatus = 'Paid';
+        } else {
+          initialPaymentStatus = 'Partially Paid';
+        }
+
+        paymentToCreate = {
+          amount: resolvedPaidAmount,
+          paymentMode: resolvedPaymentMode || 'Grivana Credits',
+          transactionReference: resolvedTxnRef || `AUTO-${Date.now()}`,
+          paymentStatus: 'Completed',
+        };
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -441,7 +494,7 @@ export class OrderService implements OnModuleInit {
           pickupDate: pickupDate && !isNaN(Date.parse(pickupDate)) ? new Date(pickupDate) : null,
           deliveryDate: deliveryDate && !isNaN(Date.parse(deliveryDate)) ? new Date(deliveryDate) : null,
           orderStatus: 'New Order',
-          paymentStatus: 'Pending',
+          paymentStatus: initialPaymentStatus,
           totalAmount: bill.subtotal,
           discountAmount: bill.totalDiscount,
           taxAmount: bill.taxAmount,
@@ -470,6 +523,18 @@ export class OrderService implements OnModuleInit {
           statusHistory: true,
         },
       });
+
+      if (paymentToCreate) {
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            amount: paymentToCreate.amount,
+            paymentMode: paymentToCreate.paymentMode,
+            transactionReference: paymentToCreate.transactionReference,
+            paymentStatus: 'Completed',
+          },
+        });
+      }
 
       // Create a default notification log for customer
       await tx.notification.create({

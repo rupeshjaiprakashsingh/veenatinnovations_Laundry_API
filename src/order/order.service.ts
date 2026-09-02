@@ -169,13 +169,13 @@ export class OrderService implements OnModuleInit {
       where: { referredId: customerId },
     });
     if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
-      referralDiscount = 50.0;
+      referralDiscount = 100.0;
     } else {
       const pendingReferrerReferral = await this.prisma.referral.findFirst({
         where: { referrerId: customerId, referrerUsed: false },
       });
       if (pendingReferrerReferral) {
-        referralDiscount = 50.0;
+        referralDiscount = 100.0;
       }
     }
 
@@ -368,6 +368,10 @@ export class OrderService implements OnModuleInit {
     let referralToUpdateReferredId: number | null = null;
     let referralToUpdateReferrerId: number | null = null;
 
+    const totalQuantity = (createOrderDto.orderItems || []).reduce((sum, item) => sum + item.quantity, 0);
+    const existingOrdersCount = await this.prisma.order.count({ where: { customerId } });
+    const isFirstOrder = existingOrdersCount === 0;
+
     if (bill.referralDiscount > 0) {
       const pendingRefereeReferral = await this.prisma.referral.findUnique({
         where: { referredId: customerId },
@@ -418,6 +422,19 @@ export class OrderService implements OnModuleInit {
           where: { id: referralToUpdateReferredId },
           data: { referredUsed: true },
         });
+      }
+
+      // If referred customer places their 1st order with >10 clothes, award ₹100 to referrer
+      if (isFirstOrder && totalQuantity > 10) {
+        const refRecord = await tx.referral.findUnique({
+          where: { referredId: customerId },
+        });
+        if (refRecord) {
+          await tx.referral.update({
+            where: { id: refRecord.id },
+            data: { referredUsed: true, referrerUsed: false },
+          });
+        }
       }
 
       if (referralToUpdateReferrerId) {

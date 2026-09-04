@@ -30,6 +30,22 @@ export class DeliveryService {
     return this.prisma.$transaction(async (tx) => {
       // 1. If order status is "New Order" or "Pickup Scheduled", it is a PICKUP request assignment
       if (order.orderStatus === 'New Order' || order.orderStatus === 'Pickup Scheduled') {
+        const pickupAddress = [
+          order.houseDetails,
+          order.landmark ? `(Landmark: ${order.landmark})` : null,
+          order.address,
+          order.city,
+          order.state,
+          order.pincode,
+        ].filter(Boolean).join(', ') || [
+          order.customer?.houseDetails,
+          order.customer?.landmark,
+          order.customer?.address,
+          order.customer?.city,
+          order.customer?.state,
+          order.customer?.pincode,
+        ].filter(Boolean).join(', ') || 'Customer Address';
+
         let pickup = await tx.pickupRequest.findFirst({
           where: {
             customerId: order.customerId,
@@ -43,19 +59,10 @@ export class DeliveryService {
             data: {
               assignedEmployeeId: dto.deliveryEmployeeId,
               status: 'Assigned',
+              pickupAddress,
             },
           });
         } else {
-          const pickupAddress = [
-            order.houseDetails || order.customer?.houseDetails,
-            order.landmark || order.customer?.landmark,
-            order.address || order.customer?.address,
-            order.city || order.customer?.city,
-            order.pincode || order.customer?.pincode,
-          ]
-            .filter(Boolean)
-            .join(', ') || 'Customer Address';
-
           pickup = await tx.pickupRequest.create({
             data: {
               customerId: order.customerId,

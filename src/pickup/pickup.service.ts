@@ -54,8 +54,25 @@ export class PickupService {
 
         const generatedOrderNumber = `ORD-${String(pickup.id).padStart(5, '0')}`;
 
+        // Compute resolved pickup address from the active order if available
+        let resolvedAddress = pickup.pickupAddress;
+        if (activeOrder && (activeOrder.address || activeOrder.houseDetails)) {
+          const parts = [
+            activeOrder.houseDetails,
+            activeOrder.landmark ? `(Landmark: ${activeOrder.landmark})` : null,
+            activeOrder.address,
+            activeOrder.city,
+            activeOrder.state,
+            activeOrder.pincode,
+          ].filter(Boolean);
+          if (parts.length > 0) {
+            resolvedAddress = parts.join(', ');
+          }
+        }
+
         return {
           ...pickup,
+          pickupAddress: resolvedAddress,
           order: activeOrder
             ? {
                 id: activeOrder.id,
@@ -63,6 +80,13 @@ export class PickupService {
                 netAmount: activeOrder.netAmount,
                 paymentStatus: activeOrder.paymentStatus,
                 laundryShop: activeOrder.laundryShop,
+                addressTitle: activeOrder.addressTitle,
+                address: activeOrder.address,
+                houseDetails: activeOrder.houseDetails,
+                landmark: activeOrder.landmark,
+                city: activeOrder.city,
+                state: activeOrder.state,
+                pincode: activeOrder.pincode,
               }
             : {
                 id: pickup.id,
@@ -70,6 +94,13 @@ export class PickupService {
                 netAmount: 0,
                 paymentStatus: 'Pending',
                 laundryShop: null,
+                addressTitle: null,
+                address: null,
+                houseDetails: null,
+                landmark: null,
+                city: null,
+                state: null,
+                pincode: null,
               },
         };
       }),
@@ -171,18 +202,35 @@ export class PickupService {
 
     const enrichedPickups = await Promise.all(
       pickups.map(async (pickup) => {
-        let activeOrder = await this.prisma.order.findFirst({
-          where: {
-            customerId: pickup.customerId,
-            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
-          },
-          include: { laundryShop: true },
-          orderBy: { id: 'desc' },
-        });
-
-        if (!activeOrder) {
+        // If pickup is Completed or Cancelled, do not attach an unrelated newer active order!
+        let activeOrder: any = null;
+        if (pickup.status === 'Pending' || pickup.status === 'Assigned') {
           activeOrder = await this.prisma.order.findFirst({
-            where: { customerId: pickup.customerId },
+            where: {
+              customerId: pickup.customerId,
+              orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+            },
+            include: { laundryShop: true },
+            orderBy: { id: 'desc' },
+          });
+
+          if (!activeOrder) {
+            activeOrder = await this.prisma.order.findFirst({
+              where: {
+                customerId: pickup.customerId,
+                orderStatus: { in: ['Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
+              },
+              include: { laundryShop: true },
+              orderBy: { id: 'desc' },
+            });
+          }
+        } else {
+          // For completed/cancelled pickups, find order where status is Picked Up or beyond
+          activeOrder = await this.prisma.order.findFirst({
+            where: {
+              customerId: pickup.customerId,
+              orderStatus: { notIn: ['New Order', 'Pickup Scheduled'] },
+            },
             include: { laundryShop: true },
             orderBy: { id: 'desc' },
           });
@@ -190,8 +238,25 @@ export class PickupService {
 
         const generatedOrderNumber = `ORD-${String(pickup.id).padStart(5, '0')}`;
 
+        // Compute resolved pickup address from the active order if available
+        let resolvedAddress = pickup.pickupAddress;
+        if (activeOrder && (activeOrder.address || activeOrder.houseDetails)) {
+          const parts = [
+            activeOrder.houseDetails,
+            activeOrder.landmark ? `(Landmark: ${activeOrder.landmark})` : null,
+            activeOrder.address,
+            activeOrder.city,
+            activeOrder.state,
+            activeOrder.pincode,
+          ].filter(Boolean);
+          if (parts.length > 0) {
+            resolvedAddress = parts.join(', ');
+          }
+        }
+
         return {
           ...pickup,
+          pickupAddress: resolvedAddress,
           order: activeOrder
             ? {
                 id: activeOrder.id,
@@ -199,6 +264,13 @@ export class PickupService {
                 netAmount: activeOrder.netAmount,
                 paymentStatus: activeOrder.paymentStatus,
                 laundryShop: activeOrder.laundryShop,
+                addressTitle: activeOrder.addressTitle,
+                address: activeOrder.address,
+                houseDetails: activeOrder.houseDetails,
+                landmark: activeOrder.landmark,
+                city: activeOrder.city,
+                state: activeOrder.state,
+                pincode: activeOrder.pincode,
               }
             : {
                 id: pickup.id,
@@ -206,6 +278,13 @@ export class PickupService {
                 netAmount: 0,
                 paymentStatus: 'Pending',
                 laundryShop: null,
+                addressTitle: null,
+                address: null,
+                houseDetails: null,
+                landmark: null,
+                city: null,
+                state: null,
+                pincode: null,
               },
         };
       }),

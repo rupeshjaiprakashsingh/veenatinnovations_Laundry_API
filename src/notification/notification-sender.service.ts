@@ -226,14 +226,43 @@ export class NotificationSenderService {
     await this.sendEmail(to, 'Welcome to Saimorphix Innovations!', html);
   }
 
+  async sendLoginAlertEmail(to: string, name: string, loginTime: string, loginMethod: string) {
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #4F46E5; margin: 0; font-size: 22px;">Security Alert: New Sign-in</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">Dear <strong>${name || 'Valued Customer'}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Your Grivana account was just accessed from a new login session.</p>
+        
+        <div style="background-color: #F8FAFC; border-left: 4px solid #4F46E5; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0 0 6px 0; color: #1E293B; font-weight: 600; font-size: 14px;">Login Details:</p>
+          <p style="margin: 4px 0; color: #475569; font-size: 13px;"><strong>Date &amp; Time:</strong> ${loginTime}</p>
+          <p style="margin: 4px 0; color: #475569; font-size: 13px;"><strong>Sign-in Method:</strong> ${loginMethod}</p>
+          <p style="margin: 4px 0; color: #475569; font-size: 13px;"><strong>Platform:</strong> Grivana App</p>
+        </div>
+
+        <p style="color: #64748B; font-size: 13px; line-height: 1.5;">If this was you, no further action is required. If you did not sign in, please contact Grivana Support immediately.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
+      </div>
+    `;
+    await this.sendEmail(to, 'Security Alert: New Sign-in to your Grivana Account', html);
+  }
+
   async sendOrderCreatedEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {
-    const itemsHtml = (items || []).map(item => `
+    const itemsList = Array.isArray(items) ? items : [];
+    const itemsHtml = itemsList.length > 0 ? itemsList.map(item => `
       <tr>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; color: #334155;">${item.clothType || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; color: #334155;">${item.clothType || item.name || 'Garment'}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #334155;">${item.quantity || 1}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #334155;">${item.service?.serviceName || 'Service'}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #334155;">${item.service?.serviceName || item.serviceName || 'Service'}</td>
       </tr>
-    `).join('');
+    `).join('') : `
+      <tr>
+        <td colspan="3" style="padding: 10px 8px; text-align: center; color: #64748B;">Standard Laundry Order</td>
+      </tr>
+    `;
 
     const html = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
@@ -264,7 +293,7 @@ export class NotificationSenderService {
         <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">&copy; Saimorphix Innovations. All rights reserved.</p>
       </div>
     `;
-    await this.sendEmail(to, `Order Confirmation #${orderNumber}`, html);
+    await this.sendEmail(to, `Order Confirmed: #${orderNumber} - Grivana`, html);
   }
 
   async sendDeliveryInvoiceEmail(to: string, name: string, orderNumber: string, amount: number, items: any[]) {

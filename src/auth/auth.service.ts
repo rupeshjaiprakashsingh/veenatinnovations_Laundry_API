@@ -79,6 +79,12 @@ export class AuthService {
       });
     }
 
+    if (user.email && user.email.includes('@')) {
+      const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+      this.notificationSender.sendLoginAlertEmail(user.email.trim(), name, nowStr, 'Password Login')
+        .catch(err => console.error('[AUTH] Failed to send login alert email:', err));
+    }
+
     return {
       user: {
         id: user.id,
@@ -483,6 +489,13 @@ export class AuthService {
       where: { id: customer.id },
       data: { refreshToken: tokens.refreshToken },
     });
+
+    if (customer.email && customer.email.includes('@')) {
+      const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+      const custName = `${customer.firstName} ${customer.lastName}`.trim();
+      this.notificationSender.sendLoginAlertEmail(customer.email.trim(), custName, nowStr, 'Mobile OTP Login')
+        .catch(err => console.error('[AUTH] Failed to send login alert email:', err));
+    }
 
     return {
       exists: true,

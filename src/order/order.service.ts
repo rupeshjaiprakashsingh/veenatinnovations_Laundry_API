@@ -401,7 +401,7 @@ export class OrderService implements OnModuleInit {
     }
 
     // Create Order + OrderItems in a transaction
-    return this.prisma.$transaction(async (tx) => {
+    const resultOrder = await this.prisma.$transaction(async (tx) => {
       // If insurance is opted and customer does not have active insurance, extend subscription
       const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
       if (createOrderDto.insuranceOpted && !hasActiveInsurance) {
@@ -564,26 +564,29 @@ export class OrderService implements OnModuleInit {
         },
       });
 
-      // Send order confirmation email — outside of transaction so DB commit is
-      // not held open waiting for a network call to the email provider.
-      const createdOrder = this.enrichOrderWithBillingDetails(order);
-
-      if (order.customer?.email && order.customer.email.trim().includes('@')) {
-        this.notificationSender.sendOrderCreatedEmail(
-          order.customer.email.trim(),
-          order.customer.firstName || 'Customer',
-          order.orderNumber,
-          order.netAmount,
-          order.orderItems
-        ).catch(err => {
-          console.error(`[ORDER EMAIL FAILED] Order ${order.orderNumber} to ${order.customer.email}:`, err?.message || err);
-        });
-      } else {
-        console.warn(`[ORDER EMAIL SKIPPED] Customer has no valid email. Order: ${order.orderNumber} | customerId: ${order.customerId}`);
-      }
-
-      return createdOrder;
+      return this.enrichOrderWithBillingDetails(order);
     });
+
+    // Send order confirmation email — outside of transaction so DB commit is
+    // completed first and not held open waiting for a network call to the email provider.
+    const targetEmail = (resultOrder.customer?.email || customer?.email || '').trim();
+    const customerName = (resultOrder.customer?.firstName || customer?.firstName || 'Customer').trim();
+
+    if (targetEmail && targetEmail.includes('@')) {
+      this.notificationSender.sendOrderCreatedEmail(
+        targetEmail,
+        customerName,
+        resultOrder.orderNumber,
+        resultOrder.netAmount,
+        resultOrder.orderItems
+      ).catch(err => {
+        console.error(`[ORDER EMAIL FAILED] Order ${resultOrder.orderNumber} to ${targetEmail}:`, err?.message || err);
+      });
+    } else {
+      console.warn(`[ORDER EMAIL SKIPPED] Customer has no valid email. Order: ${resultOrder.orderNumber} | customerId: ${resultOrder.customerId}`);
+    }
+
+    return resultOrder;
   }
 
   enrichOrderWithBillingDetails(order: any) {

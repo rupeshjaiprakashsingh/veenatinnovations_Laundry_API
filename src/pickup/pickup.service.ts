@@ -149,17 +149,20 @@ export class PickupService {
         });
 
         if (activeOrder) {
-          // Update order status to Picked Up
+          // If a laundry shop was selected/provided, the order advances directly to 'Laundry'
+          const nextOrderStatus = dto.laundryShopId ? 'Laundry' : 'Picked Up';
+
+          // Update order status
           const updatedOrder = await tx.order.update({
             where: { id: activeOrder.id },
             data: {
-              orderStatus: 'Picked Up',
+              orderStatus: nextOrderStatus,
               laundryShopId: dto.laundryShopId || undefined,
             },
-            include: { customer: true },
+            include: { customer: true, laundryShop: true },
           });
 
-          // Create status history entry
+          // Create status history entry for Picked Up
           await tx.orderStatusHistory.create({
             data: {
               orderId: activeOrder.id,
@@ -167,15 +170,25 @@ export class PickupService {
             },
           });
 
-          // Send Picked Up notification email
+          // If assigned to laundry shop, also record Assigned to Laundry in history
+          if (dto.laundryShopId) {
+            await tx.orderStatusHistory.create({
+              data: {
+                orderId: activeOrder.id,
+                status: 'Assigned to Laundry',
+              },
+            });
+          }
+
+          // Send notification email
           if (updatedOrder.customer?.email) {
             this.notificationSender.sendOrderStatusUpdateEmail(
               updatedOrder.customer.email,
               updatedOrder.customer.firstName,
               updatedOrder.orderNumber,
-              'Picked Up'
+              nextOrderStatus
             ).catch(err => {
-              console.error('Picked Up status email failed:', err);
+              console.error(`${nextOrderStatus} status email failed:`, err);
             });
           }
         }

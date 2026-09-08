@@ -117,6 +117,7 @@ export class OrderService implements OnModuleInit {
       resolvedItems.push({
         serviceId: item.serviceId,
         serviceName: service.serviceName,
+        serviceType: service.serviceType,
         clothType: item.clothType,
         quantity: item.quantity,
         unitPrice,
@@ -135,15 +136,20 @@ export class OrderService implements OnModuleInit {
     const orderCount = await this.prisma.order.count({ where: { customerId } });
     const isFirstOrder = orderCount === 0;
 
-    const isPriorityOrder = resolvedItems.some(item => {
-      const sName = (item.serviceName || '').toLowerCase();
-      const sType = (item.serviceType || '').toLowerCase();
-      return sName.includes('priority') || sType.includes('priority');
-    }) || (createOrderDto.notes && createOrderDto.notes.toLowerCase().includes('priority'));
+    const isPriorityOrder =
+      createOrderDto.isPriority === true ||
+      resolvedItems.some(item => {
+        const sName = (item.serviceName || '').toLowerCase();
+        const sType = (item.serviceType || '').toLowerCase();
+        return sName.includes('priority') || sType.includes('priority');
+      }) ||
+      (createOrderDto.notes && createOrderDto.notes.toLowerCase().includes('priority'));
 
-    // Universal Delivery Rule: Below 10 clothes – delivery will be charged ₹30.00; 10 or more clothes – delivery is FREE (₹0.00)
-    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 30.0;
-    const freeDeliverySaving = totalQuantity >= 10 ? 30.0 : 0.0;
+    // Universal Delivery Rule:
+    // For Grivana Priority: Delivery charges will ALWAYS apply (₹30.00), whether 1 cloth or 20 clothes.
+    // For Standard service: Below 10 clothes – delivery will be charged ₹30.00; 10 or more clothes – delivery is FREE (₹0.00).
+    const deliveryCharge = isPriorityOrder ? 30.0 : (totalQuantity >= 10 ? 0.0 : 30.0);
+    const freeDeliverySaving = isPriorityOrder ? 0.0 : (totalQuantity >= 10 ? 30.0 : 0.0);
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
@@ -444,7 +450,9 @@ export class OrderService implements OnModuleInit {
         });
       }
 
-      const deliveryNote = bill.deliveryCharge === 0.0 ? 'Delivery: Free (First Order)' : 'Delivery: Paid';
+      const deliveryNote = bill.isPriorityOrder
+        ? 'Delivery: Paid (Priority Express ₹30)'
+        : (bill.deliveryCharge === 0.0 ? 'Delivery: Free' : 'Delivery: Paid');
       let orderNotes = notes ? `${notes} | ${deliveryNote}` : deliveryNote;
       if (bill.couponCode) {
         orderNotes += ` | Coupon Code Applied: ${bill.couponCode}`;
@@ -604,8 +612,17 @@ export class OrderService implements OnModuleInit {
       ? order.orderItems.reduce((sum: number, item: any) => sum + item.quantity, 0)
       : 0;
     
-    const deliveryCharge = totalQuantity >= 10 ? 0.0 : 30.0;
-    const freeDeliverySaving = totalQuantity >= 10 ? 30.0 : 0.0;
+    const isPriorityOrder =
+      (order.orderItems &&
+        order.orderItems.some((item: any) => {
+          const sName = (item.service?.serviceName || item.serviceName || '').toLowerCase();
+          const sType = (item.service?.serviceType || item.serviceType || '').toLowerCase();
+          return sName.includes('priority') || sType.includes('priority');
+        })) ||
+      (order.notes && order.notes.toLowerCase().includes('priority'));
+
+    const deliveryCharge = isPriorityOrder ? 30.0 : (totalQuantity >= 10 ? 0.0 : 30.0);
+    const freeDeliverySaving = isPriorityOrder ? 0.0 : (totalQuantity >= 10 ? 30.0 : 0.0);
 
     // Reconstruct insurance charge
     const reconstructedInsurance = netAmount - subtotal - taxAmount - platformFee - deliveryCharge + discountAmount;

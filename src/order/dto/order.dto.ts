@@ -60,6 +60,11 @@ export class CreateOrderDto {
   @IsOptional()
   insuranceOpted?: boolean;
 
+  @ApiProperty({ example: false, required: false })
+  @IsBoolean()
+  @IsOptional()
+  isPriority?: boolean;
+
   @ApiProperty({ example: 'YEARLY', required: false })
   @IsString()
   @IsOptional()

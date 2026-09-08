@@ -87,13 +87,13 @@ describe('OrderService Billing Calculations', () => {
     // 5 items, subtotal = 15.5 * 5 = 77.5
     // Platform fee = 5.0
     // GST (5%) = 77.5 * 0.05 = 3.88
-    // Delivery charge = 0.0 (first order, count = 0)
+    // Delivery charge = 30.0 (Standard service < 10 clothes)
     // First order discount = 0.0 (quantity <= 5)
-    // Gross total = 77.5 + 5.0 + 3.88 + 0.0 = 86.38
-    // Net amount = 86.38
-    // Final payable = 86.38
+    // Gross total = 77.5 + 5.0 + 3.88 + 30.0 = 116.38
+    // Net amount = 116.38
+    // Final payable = 116.38
     // Round off = 0.0
-    // Total savings = 20.0 (free delivery saving)
+    // Total savings = 0.0
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -107,12 +107,12 @@ describe('OrderService Billing Calculations', () => {
     expect(result.subtotal).toBe(77.5);
     expect(result.platformFee).toBe(5.0);
     expect(result.taxAmount).toBe(3.88);
-    expect(result.deliveryCharge).toBe(0.0);
-    expect(result.grossTotal).toBe(86.38);
-    expect(result.netAmount).toBe(86.38);
-    expect(result.finalPayable).toBe(86.38);
+    expect(result.deliveryCharge).toBe(30.0);
+    expect(result.grossTotal).toBe(116.38);
+    expect(result.netAmount).toBe(116.38);
+    expect(result.finalPayable).toBe(116.38);
     expect(result.roundOff).toBe(0.0);
-    expect(result.totalSavings).toBe(20.0);
+    expect(result.totalSavings).toBe(0.0);
   });
 
   it('should apply free delivery when items count is 10 or more', async () => {
@@ -135,12 +135,13 @@ describe('OrderService Billing Calculations', () => {
     // 10 items, subtotal = 100 * 10 = 1000
     // Platform fee = 5.0
     // GST (5%) = 1000 * 0.05 = 50.0
-    // Delivery charge = 0.0 (first order, count = 0)
+    // Delivery charge = 0.0 (standard order >= 10 clothes is FREE)
+    // Free delivery saving = 30.0
     // First order discount = 50.0 (quantity > 5)
     // Gross total = 1000 + 5.0 + 50.0 + 0 = 1055.0
     // Net amount = 1055.0 - 50 = 1005.0
     // Final payable = 1005.0
-    // Total savings = 20.0 (free delivery saving) + 50.0 (first order discount) = 70.0
+    // Total savings = 30.0 (free delivery saving) + 50.0 (first order discount) = 80.0
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -151,7 +152,7 @@ describe('OrderService Billing Calculations', () => {
     });
 
     expect(result.deliveryCharge).toBe(0.0);
-    expect(result.totalSavings).toBe(70.0);
+    expect(result.totalSavings).toBe(80.0);
     expect(result.finalPayable).toBe(1005.0);
   });
 
@@ -182,12 +183,12 @@ describe('OrderService Billing Calculations', () => {
     // 1 item, subtotal = 10.0
     // Platform fee = 5.0
     // GST (5%) = 0.50
-    // Delivery charge = 0.0 (first order, count = 0)
+    // Delivery charge = 30.0 (< 10 items)
     // First order discount = 0.0
     // Coupon discount = 500.0
-    // Gross total = 10 + 5 + 0.50 + 0.0 = 15.50
+    // Gross total = 10 + 5 + 0.50 + 30.0 = 45.50
     // Total discount = 500.0
-    // Cap total discount at gross total (15.50)
+    // Cap total discount at gross total (45.50)
     // Net amount = 0.0
     // Final payable = 0.0
 
@@ -200,9 +201,123 @@ describe('OrderService Billing Calculations', () => {
       couponCode: 'SUPERMEGA',
     });
 
-    expect(result.totalDiscount).toBe(15.50);
+    expect(result.totalDiscount).toBe(45.50);
     expect(result.netAmount).toBe(0.0);
     expect(result.finalPayable).toBe(0.0);
+  });
+
+  it('should always apply ₹30 delivery charge for Grivana Priority with 1 item', async () => {
+    customerRepositoryMock.findById.mockResolvedValue({
+      id: 1,
+      insuranceExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    });
+
+    serviceRepositoryMock.findById.mockResolvedValue({
+      id: 10,
+      serviceName: 'Grivana Priority Express',
+      serviceType: 'Grivana Priority',
+      price: 25.0,
+      isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 10,
+      price: 25.0,
+    });
+
+    const result = await orderService.calculateOrderBillDetails({
+      customerId: 1,
+      branchId: 1,
+      orderItems: [
+        { serviceId: 10, clothType: 'Shirt', quantity: 1 },
+      ],
+      isPriority: true,
+    });
+
+    expect(result.isPriorityOrder).toBe(true);
+    expect(result.deliveryCharge).toBe(30.0);
+    // Subtotal 25 + platform 5 + tax 1.25 + delivery 30 = 61.25
+    expect(result.finalPayable).toBe(61.25);
+  });
+
+  it('should always apply ₹30 delivery charge for Grivana Priority with 12 items (never free)', async () => {
+    customerRepositoryMock.findById.mockResolvedValue({
+      id: 1,
+      insuranceExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    });
+
+    serviceRepositoryMock.findById.mockResolvedValue({
+      id: 10,
+      serviceName: 'Grivana Priority Express',
+      serviceType: 'Grivana Priority',
+      price: 16.0,
+      isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 10,
+      price: 16.0,
+    });
+
+    // 12 items * 16 = 192.00
+    // Platform fee = 5.00
+    // GST (5%) = 9.60
+    // Delivery charge = 30.00 (Priority orders ALWAYS charged delivery)
+    // First order discount = 0.0 (mocked existing orders or non-first)
+    prismaMock.order.count.mockResolvedValue(1);
+
+    const result = await orderService.calculateOrderBillDetails({
+      customerId: 1,
+      branchId: 1,
+      orderItems: [
+        { serviceId: 10, clothType: 'Shirt', quantity: 12 },
+      ],
+      isPriority: true,
+    });
+
+    expect(result.isPriorityOrder).toBe(true);
+    expect(result.subtotal).toBe(192.00);
+    expect(result.platformFee).toBe(5.0);
+    expect(result.taxAmount).toBe(9.60);
+    expect(result.deliveryCharge).toBe(30.0);
+    expect(result.grossTotal).toBe(236.60);
+    expect(result.finalPayable).toBe(236.60);
+    expect(result.totalSavings).toBe(0.0); // NO free delivery savings
+  });
+
+  it('should always apply ₹30 delivery charge for Grivana Priority with 20 items (max cap)', async () => {
+    customerRepositoryMock.findById.mockResolvedValue({
+      id: 1,
+      insuranceExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    });
+
+    serviceRepositoryMock.findById.mockResolvedValue({
+      id: 10,
+      serviceName: 'Grivana Priority Express',
+      serviceType: 'Grivana Priority',
+      price: 20.0,
+      isActive: true,
+    });
+    prismaMock.service.findUnique.mockResolvedValue({
+      id: 10,
+      price: 20.0,
+    });
+
+    prismaMock.order.count.mockResolvedValue(2);
+
+    const result = await orderService.calculateOrderBillDetails({
+      customerId: 1,
+      branchId: 1,
+      orderItems: [
+        { serviceId: 10, clothType: 'Shirt', quantity: 20 },
+      ],
+      notes: 'Priority: Grivana Priority',
+    });
+
+    expect(result.isPriorityOrder).toBe(true);
+    expect(result.deliveryCharge).toBe(30.0);
+    expect(result.subtotal).toBe(400.0);
+    // 400 + 5 + 20 (tax) + 30 (delivery) = 455.0
+    expect(result.finalPayable).toBe(455.0);
+    expect(result.totalSavings).toBe(0.0);
   });
 
   it('should use configurable GST rate from process.env', async () => {

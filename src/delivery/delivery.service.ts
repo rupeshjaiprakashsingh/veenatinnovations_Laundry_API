@@ -46,10 +46,15 @@ export class DeliveryService {
           order.customer?.pincode,
         ].filter(Boolean).join(', ') || 'Customer Address';
 
+        const slot = order.notes?.includes('Slot:')
+          ? order.notes.split('|').find((p) => p.includes('Slot:'))?.replace('Slot:', '').trim() || 'Anytime'
+          : 'Anytime';
+        const orderTag = `[ORDER:${order.id}]`;
+
         let pickup = await tx.pickupRequest.findFirst({
           where: {
             customerId: order.customerId,
-            status: { in: ['Pending', 'Assigned'] },
+            pickupTime: { contains: orderTag },
           },
         });
 
@@ -60,6 +65,7 @@ export class DeliveryService {
               assignedEmployeeId: dto.deliveryEmployeeId,
               status: 'Assigned',
               pickupAddress,
+              pickupTime: `${slot} ${orderTag}`,
             },
           });
         } else {
@@ -68,9 +74,7 @@ export class DeliveryService {
               customerId: order.customerId,
               pickupAddress,
               pickupDate: order.pickupDate ? new Date(order.pickupDate) : new Date(),
-              pickupTime: order.notes?.includes('Slot:')
-                ? order.notes.split('|').find((p) => p.includes('Slot:'))?.replace('Slot:', '').trim() || 'Anytime'
-                : 'Anytime',
+              pickupTime: `${slot} ${orderTag}`,
               status: 'Assigned',
               assignedEmployeeId: dto.deliveryEmployeeId,
             },

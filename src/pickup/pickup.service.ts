@@ -4,6 +4,17 @@ import { CreatePickupRequestDto, AssignPickupDto, UpdatePickupStatusDto } from '
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationSenderService } from '../notification/notification-sender.service';
 
+function extractOrderIdFromPickupTime(pickupTime?: string | null): number | null {
+  if (!pickupTime) return null;
+  const match = pickupTime.match(/\[ORDER:(\d+)\]/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+function cleanPickupTime(pickupTime?: string | null): string {
+  if (!pickupTime) return 'Anytime';
+  return pickupTime.replace(/\s*\[ORDER:\d+\]/, '').trim() || 'Anytime';
+}
+
 @Injectable()
 export class PickupService {
   constructor(
@@ -35,14 +46,26 @@ export class PickupService {
 
     const enrichedPickups = await Promise.all(
       pickups.map(async (pickup) => {
-        let activeOrder = await this.prisma.order.findFirst({
-          where: {
-            customerId: pickup.customerId,
-            orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery', 'Out For Delivery', 'Delivered'] },
-          },
-          include: { laundryShop: true },
-          orderBy: { id: 'desc' },
-        });
+        const orderId = extractOrderIdFromPickupTime(pickup.pickupTime);
+        let activeOrder: any = null;
+
+        if (orderId) {
+          activeOrder = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: { laundryShop: true },
+          });
+        }
+
+        if (!activeOrder) {
+          activeOrder = await this.prisma.order.findFirst({
+            where: {
+              customerId: pickup.customerId,
+              orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up', 'Laundry', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery', 'Out For Delivery', 'Delivered'] },
+            },
+            include: { laundryShop: true },
+            orderBy: { id: 'desc' },
+          });
+        }
 
         if (!activeOrder) {
           activeOrder = await this.prisma.order.findFirst({
@@ -72,6 +95,7 @@ export class PickupService {
 
         return {
           ...pickup,
+          pickupTime: cleanPickupTime(pickup.pickupTime),
           pickupAddress: resolvedAddress,
           order: activeOrder
             ? {
@@ -139,14 +163,26 @@ export class PickupService {
       });
 
       if (dto.status === 'Completed') {
-        // Find the active order for this customer in pickup phase (New Order or Pickup Scheduled)
-        const activeOrder = await tx.order.findFirst({
-          where: {
-            customerId: pickup.customerId,
-            orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
-          },
-          orderBy: { id: 'desc' },
-        });
+        const targetOrderId = extractOrderIdFromPickupTime(pickup.pickupTime);
+        let activeOrder: any = null;
+
+        if (targetOrderId) {
+          activeOrder = await tx.order.findUnique({
+            where: { id: targetOrderId },
+            include: { customer: true, laundryShop: true },
+          });
+        }
+
+        if (!activeOrder) {
+          // Find the active order for this customer in pickup phase (New Order or Pickup Scheduled)
+          activeOrder = await tx.order.findFirst({
+            where: {
+              customerId: pickup.customerId,
+              orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+            },
+            orderBy: { id: 'desc' },
+          });
+        }
 
         if (activeOrder) {
           // If a laundry shop was selected/provided, the order advances directly to 'Laundry'
@@ -207,46 +243,129 @@ export class PickupService {
   }
 
   async findByEmployee(employeeId: number) {
+    // Auto-sync: Ensure all orders assigned to this delivery employee in pickup phase have a dedicated PickupRequest
+    try {
+      const pendingAssignedDeliveries = await this.prisma.delivery.findMany({
+        where: {
+          deliveryEmployeeId: employeeId,
+          order: {
+            orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+          },
+        },
+        include: {
+          order: {
+            include: { customer: true, laundryShop: true },
+          },
+        },
+      });
+
+      for (const del of pendingAssignedDeliveries) {
+        const ord = del.order;
+        if (!ord) continue;
+        const orderTag = `[ORDER:${ord.id}]`;
+        const existingPickup = await this.prisma.pickupRequest.findFirst({
+          where: {
+            customerId: ord.customerId,
+            pickupTime: { contains: orderTag },
+          },
+        });
+
+        if (!existingPickup) {
+          const pickupAddress = [
+            ord.houseDetails,
+            ord.landmark ? `(Landmark: ${ord.landmark})` : null,
+            ord.address,
+            ord.city,
+            ord.state,
+            ord.pincode,
+          ].filter(Boolean).join(', ') || [
+            ord.customer?.houseDetails,
+            ord.customer?.landmark,
+            ord.customer?.address,
+            ord.customer?.city,
+            ord.customer?.state,
+            ord.customer?.pincode,
+          ].filter(Boolean).join(', ') || 'Customer Address';
+
+          const slot = ord.notes?.includes('Slot:')
+            ? ord.notes.split('|').find((p) => p.includes('Slot:'))?.replace('Slot:', '').trim() || 'Anytime'
+            : 'Anytime';
+
+          await this.prisma.pickupRequest.create({
+            data: {
+              customerId: ord.customerId,
+              pickupAddress,
+              pickupDate: ord.pickupDate ? new Date(ord.pickupDate) : new Date(),
+              pickupTime: `${slot} ${orderTag}`,
+              status: 'Assigned',
+              assignedEmployeeId: employeeId,
+            },
+          });
+        } else if (existingPickup.assignedEmployeeId !== employeeId && existingPickup.status !== 'Completed') {
+          await this.prisma.pickupRequest.update({
+            where: { id: existingPickup.id },
+            data: {
+              assignedEmployeeId: employeeId,
+              status: 'Assigned',
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Auto-sync pending pickups error:', err);
+    }
+
     const pickups = await this.pickupRepository.findAll({
       where: { assignedEmployeeId: employeeId },
       include: { customer: true },
-      orderBy: { pickupDate: 'desc' },
+      orderBy: { id: 'desc' },
     });
 
     const enrichedPickups = await Promise.all(
       pickups.map(async (pickup) => {
-        // If pickup is Completed or Cancelled, do not attach an unrelated newer active order!
+        const orderId = extractOrderIdFromPickupTime(pickup.pickupTime);
         let activeOrder: any = null;
-        if (pickup.status === 'Pending' || pickup.status === 'Assigned') {
-          activeOrder = await this.prisma.order.findFirst({
-            where: {
-              customerId: pickup.customerId,
-              orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
-            },
-            include: { laundryShop: true },
-            orderBy: { id: 'desc' },
-          });
 
-          if (!activeOrder) {
+        if (orderId) {
+          activeOrder = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: { laundryShop: true },
+          });
+        }
+
+        if (!activeOrder) {
+          // If pickup is Completed or Cancelled, do not attach an unrelated newer active order!
+          if (pickup.status === 'Pending' || pickup.status === 'Assigned') {
             activeOrder = await this.prisma.order.findFirst({
               where: {
                 customerId: pickup.customerId,
-                orderStatus: { in: ['Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
+                orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+              },
+              include: { laundryShop: true },
+              orderBy: { id: 'desc' },
+            });
+
+            if (!activeOrder) {
+              activeOrder = await this.prisma.order.findFirst({
+                where: {
+                  customerId: pickup.customerId,
+                  orderStatus: { in: ['Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
+                },
+                include: { laundryShop: true },
+                orderBy: { id: 'desc' },
+              });
+            }
+          } else {
+            // For completed/cancelled pickups, find order where status is Picked Up or beyond
+            activeOrder = await this.prisma.order.findFirst({
+              where: {
+                customerId: pickup.customerId,
+                orderStatus: { notIn: ['New Order', 'Pickup Scheduled'] },
               },
               include: { laundryShop: true },
               orderBy: { id: 'desc' },
             });
           }
-        } else {
-          // For completed/cancelled pickups, find order where status is Picked Up or beyond
-          activeOrder = await this.prisma.order.findFirst({
-            where: {
-              customerId: pickup.customerId,
-              orderStatus: { notIn: ['New Order', 'Pickup Scheduled'] },
-            },
-            include: { laundryShop: true },
-            orderBy: { id: 'desc' },
-          });
         }
 
         const generatedOrderNumber = `ORD-${String(pickup.id).padStart(5, '0')}`;
@@ -269,6 +388,7 @@ export class PickupService {
 
         return {
           ...pickup,
+          pickupTime: cleanPickupTime(pickup.pickupTime),
           pickupAddress: resolvedAddress,
           order: activeOrder
             ? {

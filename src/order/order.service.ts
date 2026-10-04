@@ -127,8 +127,8 @@ export class OrderService implements OnModuleInit {
 
     const platformFee = 5.0;
 
-    // Configurable GST/Tax Rate (default 5%)
-    const gstRatePercent = parseFloat(process.env.GST_RATE || '5');
+    // Configurable GST/Tax Rate (default 18%)
+    const gstRatePercent = parseFloat(process.env.GST_RATE || '18');
     const gstRate = gstRatePercent / 100;
     const taxAmount = parseFloat((subtotal * gstRate).toFixed(2));
 
@@ -175,13 +175,13 @@ export class OrderService implements OnModuleInit {
       where: { referredId: customerId },
     });
     if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
-      referralDiscount = 100.0;
+      referralDiscount = 50.0;
     } else {
       const pendingReferrerReferral = await this.prisma.referral.findFirst({
         where: { referrerId: customerId, referrerUsed: false },
       });
       if (pendingReferrerReferral) {
-        referralDiscount = 100.0;
+        referralDiscount = 50.0;
       }
     }
 

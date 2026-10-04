@@ -107,32 +107,6 @@ export class DeliveryService {
           });
         }
 
-        // Automatically pre-create/update the Delivery record so the delivery boy is assigned for both pickup and delivery phase
-        const existingDelivery = await tx.delivery.findFirst({
-          where: { orderId: dto.orderId },
-        });
-
-        if (!existingDelivery) {
-          await tx.delivery.create({
-            data: {
-              orderId: dto.orderId,
-              deliveryEmployeeId: dto.deliveryEmployeeId,
-              deliveryStatus: 'Pending',
-              deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
-              deliveryRemarks: dto.deliveryRemarks,
-            },
-          });
-        } else {
-          await tx.delivery.update({
-            where: { id: existingDelivery.id },
-            data: {
-              deliveryEmployeeId: dto.deliveryEmployeeId,
-              deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : null,
-              deliveryRemarks: dto.deliveryRemarks,
-            },
-          });
-        }
-
         return pickup;
       }
 

@@ -223,7 +223,19 @@ CREATE TABLE "order_status_history" (
     CONSTRAINT "order_status_history_pkey" PRIMARY KEY ("id")
 );
 
--- AddForeignKey
-ALTER TABLE "order_status_history" ADD CONSTRAINT "order_status_history_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "legal_contents" (
+    "id" SERIAL NOT NULL,
+    "key" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "legal_contents_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "legal_contents_key_key" ON "legal_contents"("key");
+
 
 

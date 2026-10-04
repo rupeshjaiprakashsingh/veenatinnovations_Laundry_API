@@ -332,3 +332,15 @@ model Banner {
   @@map("banners")
 }
 
+model LegalContent {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  title       String
+  content     String   @db.Text
+  createdDate DateTime @default(now())
+  updatedDate DateTime @updatedAt
+
+  @@map("legal_contents")
+}
+
+

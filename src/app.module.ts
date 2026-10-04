@@ -20,6 +20,7 @@ import { LaundryShopModule } from './laundry-shop/laundry-shop.module';
 import { CouponModule } from './coupon/coupon.module';
 import { AddressModule } from './address/address.module';
 import { BannerModule } from './banner/banner.module';
+import { LegalModule } from './legal/legal.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { BannerModule } from './banner/banner.module';
     CouponModule,
     AddressModule,
     BannerModule,
+    LegalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -34,6 +34,7 @@ export class LegalService implements OnModuleInit {
     if (k.includes('privac')) return 'privacy-policy';
     if (k.includes('term')) return 'terms-of-use';
     if (k.includes('faq')) return 'faq';
+    if (k.includes('about')) return 'about-grivana';
     return k;
   }
 
@@ -52,6 +53,7 @@ export class LegalService implements OnModuleInit {
       await this.findByKey('privacy-policy'),
       await this.findByKey('terms-of-use'),
       await this.findByKey('faq'),
+      await this.findByKey('about-grivana'),
     ];
   }
 
@@ -80,7 +82,15 @@ export class LegalService implements OnModuleInit {
 
   async update(rawKey: string, dto: UpdateLegalContentDto) {
     const key = this.normalizeKey(rawKey);
-    const title = dto.title || (key === 'privacy-policy' ? 'Privacy Policy' : 'Terms of Use');
+    const title =
+      dto.title ||
+      (key === 'privacy-policy'
+        ? 'Privacy Policy'
+        : key === 'faq'
+        ? 'Frequently Asked Questions'
+        : key === 'about-grivana'
+        ? 'About Grivana'
+        : 'Terms of Use');
     const content = dto.content;
 
     try {
@@ -112,7 +122,7 @@ export class LegalService implements OnModuleInit {
   }
 
   private async seedDefaultsIfEmpty() {
-    const keys = ['privacy-policy', 'terms-of-use', 'faq'];
+    const keys = ['privacy-policy', 'terms-of-use', 'faq', 'about-grivana'];
     for (const k of keys) {
       const existing = await this.prisma.legalContent.findUnique({ where: { key: k } });
       if (!existing) {
@@ -129,6 +139,37 @@ export class LegalService implements OnModuleInit {
   }
 
   private getDefault(key: string): { title: string; content: string } {
+    if (key === 'about-grivana') {
+      return {
+        title: 'About Grivana',
+        content: `✨ What It Is
+Grivana Laundry Service is an app based platform that makes laundry and ironing convenient by offering doorstep pickup and delivery.
+
+🚀 How It Works
+
+1. Registration 📱
+• Customers register on the Grivana app using their mobile number.
+• They fill in their personal details to create an account.
+
+2. Booking a Service 📅
+• Once logged in, customers can book a pickup for ironing or dry cleaning.
+• The backend team receives the booking notification.
+
+3. Pickup & Delivery Process 🧺
+• A delivery boy is assigned to collect clothes using a Grivana provided bag.
+• Clothes are taken to the nearest laundry shop for ironing or cleaning.
+• After completion, the delivery boy picks up the clothes and delivers them back to the customer.
+
+4. Payment 💳
+• Customers can pay via the app or in cash.
+• Once payment is confirmed, the order is closed.
+• Customers receive a code confirming successful delivery.
+
+5. Tracking 📍
+• Every step—from pickup to laundry shop to final delivery—is tracked in the app for transparency.`,
+      };
+    }
+
     if (key === 'faq') {
       return {
         title: 'Frequently Asked Questions',

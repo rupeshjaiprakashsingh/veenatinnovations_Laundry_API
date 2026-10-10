@@ -7,12 +7,12 @@ export class CreateAddressDto {
   @IsNotEmpty()
   title!: string;
 
-  @ApiProperty({ example: 'D wing 701 vaikunt dham j m road', description: 'Address line details' })
+  @ApiProperty({ example: 'Shop 1, Porwal Nivas, Bhattipada Road', description: 'Address line details' })
   @IsString()
   @IsNotEmpty()
   address!: string;
 
-  @ApiProperty({ example: 'Bhandup west', required: false })
+  @ApiProperty({ example: 'Bhandup, Mumbai', required: false })
   @IsString()
   @IsOptional()
   city?: string;
@@ -27,17 +27,17 @@ export class CreateAddressDto {
   @IsOptional()
   pincode?: string;
 
-  @ApiProperty({ example: 'opposite j b d housing society', required: false })
+  @ApiProperty({ example: 'Bhattipada Road', required: false })
   @IsString()
   @IsOptional()
   landmark?: string;
 
-  @ApiProperty({ example: 'D wing 701', required: false })
+  @ApiProperty({ example: 'Shop 1, Porwal Nivas', required: false })
   @IsString()
   @IsOptional()
   houseDetails?: string;
 
-  @ApiProperty({ example: 19.076, required: false })
+  @ApiProperty({ example: 19.1550, required: false })
   @IsNumber()
   @IsOptional()
   lat?: number;

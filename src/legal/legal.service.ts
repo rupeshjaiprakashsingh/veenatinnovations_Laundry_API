@@ -123,10 +123,11 @@ export class LegalService implements OnModuleInit {
 
   private async seedDefaultsIfEmpty() {
     const keys = ['privacy-policy', 'terms-of-use', 'faq', 'about-grivana'];
+    const newAddress = 'Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078';
     for (const k of keys) {
       const existing = await this.prisma.legalContent.findUnique({ where: { key: k } });
+      const def = this.getDefault(k);
       if (!existing) {
-        const def = this.getDefault(k);
         await this.prisma.legalContent.create({
           data: {
             key: k,
@@ -134,6 +135,19 @@ export class LegalService implements OnModuleInit {
             content: def.content,
           },
         });
+      } else if (existing.content && (existing.content.includes('Vaikunt Dham') || existing.content.includes('D-701'))) {
+        const updatedContent = existing.content
+          .replace(/D-701,\s*Vaikunt Dham Co-Op Hsg\.\s*Soc\.,\s*(?:CTS No\.\s*163-163\/17 to 89,\s*)?JM Road,\s*Bhandup,\s*Mumbai\s*[–-]\s*400078/gi, newAddress)
+          .replace(/D-701,\s*Vaikunt Dham[^,\n]+,\s*JM Road,\s*Bhandup,\s*Mumbai\s*[–-]\s*400078/gi, newAddress)
+          .replace(/D-701,\s*Vaikunt Dham[^,\n]+,[^,\n]+,\s*Bhandup[^,\n]*400078/gi, newAddress);
+        await this.prisma.legalContent.update({
+          where: { key: k },
+          data: {
+            content: updatedContent,
+            updatedDate: new Date(),
+          },
+        });
+        this.logger.log(`Migrated address for legal content key ${k} in database.`);
       }
     }
   }
@@ -197,7 +211,7 @@ Yes! You can reschedule or cancel your pickup anytime before our delivery partne
       return {
         title: 'Privacy Policy',
         content: `1. Introduction & Scope
-This Privacy Policy ("Privacy Policy") describes how Saimorphix Innovations LLP (LLPIN: ADA-0394), having its registered office at D-701, Vaikunt Dham Co-Op Hsg. Soc., CTS No. 163-163/17 to 89, JM Road, Bhandup, Mumbai - 400078 ("Grivana", "we", "us", "our"), collects, stores, uses, processes, discloses, and transfers your Personal Information when you access or use the mobile application 'Grivana' or associated website.
+This Privacy Policy ("Privacy Policy") describes how Saimorphix Innovations LLP (LLPIN: ADA-0394), having its registered office at Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078 ("Grivana", "we", "us", "our"), collects, stores, uses, processes, discloses, and transfers your Personal Information when you access or use the mobile application 'Grivana' or associated website.
 
 2. Information We Collect
 We collect:
@@ -240,7 +254,7 @@ You have the right to access, review, update, or correct your personal data thro
 9. Grievance Officer
 In accordance with Information Technology Act, 2000:
 Name: Ameet Punamiya (Chief Executive Officer)
-Address: D-701, Vaikunt Dham Co-Op Hsg. Soc., JM Road, Bhandup, Mumbai - 400078
+Address: Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078
 Email: info@saimorphixinnovations.com
 Phone: +91 9136662022`,
       };
@@ -249,7 +263,7 @@ Phone: +91 9136662022`,
     return {
       title: 'Terms of Use',
       content: `1. Introduction & Binding Agreement
-These Terms of Use ("Terms") constitute a binding legal contract between Saimorphix Innovations LLP (LLPIN: ADA-0394), having its registered office at D-701, Vaikunt Dham Co-Op Hsg. Soc., CTS No. 163-163/17 to 89, JM Road, Bhandup, Mumbai - 400078 ("Grivana", "we", "us", "our"), and you, a user of the Services ("User", "you"). By using the Platform, you represent that you have full legal capacity and agree to be bound by these Terms.
+These Terms of Use ("Terms") constitute a binding legal contract between Saimorphix Innovations LLP (LLPIN: ADA-0394), having its registered office at Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078 ("Grivana", "we", "us", "our"), and you, a user of the Services ("User", "you"). By using the Platform, you represent that you have full legal capacity and agree to be bound by these Terms.
 
 2. Services Description
 Grivana operates an on-demand laundry and garment-care technology platform connecting customers with quality laundry and dry-cleaning service providers.
@@ -277,7 +291,7 @@ Grivana and its partners take utmost care of all garments. Liability for any unf
 8. Grievance Redressal Officer
 In accordance with Information Technology Act, 2000 & Consumer Protection Rules, 2020:
 • Name: Ameet Punamiya (Chief Executive Officer)
-• Address: D-701, Vaikunt Dham Co-Op Hsg. Soc., JM Road, Bhandup, Mumbai - 400078
+• Address: Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078
 • Phone: +91 9136662022
 • Email: info@saimorphixinnovations.com
 • Hours: Mon–Fri, 10:00 AM – 6:00 PM

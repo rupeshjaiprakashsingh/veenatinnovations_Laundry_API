@@ -33,6 +33,7 @@ export class LegalService implements OnModuleInit {
     const k = (key || '').toLowerCase().trim();
     if (k.includes('privac')) return 'privacy-policy';
     if (k.includes('term')) return 'terms-of-use';
+    if (k.includes('faq')) return 'faq';
     return k;
   }
 
@@ -50,6 +51,7 @@ export class LegalService implements OnModuleInit {
     return [
       await this.findByKey('privacy-policy'),
       await this.findByKey('terms-of-use'),
+      await this.findByKey('faq'),
     ];
   }
 
@@ -110,7 +112,7 @@ export class LegalService implements OnModuleInit {
   }
 
   private async seedDefaultsIfEmpty() {
-    const keys = ['privacy-policy', 'terms-of-use'];
+    const keys = ['privacy-policy', 'terms-of-use', 'faq'];
     for (const k of keys) {
       const existing = await this.prisma.legalContent.findUnique({ where: { key: k } });
       if (!existing) {
@@ -127,6 +129,29 @@ export class LegalService implements OnModuleInit {
   }
 
   private getDefault(key: string): { title: string; content: string } {
+    if (key === 'faq') {
+      return {
+        title: 'Frequently Asked Questions',
+        content: `❓ How do I schedule a pickup?
+Simply choose your preferred service (Ironing, Wash & Fold, Wash & Iron, or Dry Cleaning), select your address and preferred pickup time slot, and tap 'Confirm Booking'. Our delivery executive will arrive with a Grivana laundry bag.
+
+⏱️ How long does the service take?
+Standard Ironing is typically delivered within 24 hours. Wash & Fold / Wash & Iron takes 24 to 48 hours. Express same-day delivery options are also available at checkout.
+
+💰 How can I pay for my order?
+You can pay online via UPI, Credit/Debit Cards, Net Banking, Grivana Credits / Wallet balance, or Cash on Delivery (COD) when your clothes are delivered.
+
+🛍️ How are my clothes counted and verified?
+During pickup, the delivery executive counts your clothes in front of you. Once received at our verified processing facility, each garment is inspected, tagged, and logged in your app order details.
+
+🌿 How do you care for delicate fabrics & colors?
+We separate whites and dark colored clothes to avoid color bleeding. Delicate garments such as silks, woolens, and designer wears are processed using specialized gentle detergents and steam ironing.
+
+🔄 Can I reschedule or cancel a booking?
+Yes! You can reschedule or cancel your pickup anytime before our delivery partner is out for pickup directly from the 'Orders' / 'Track' tab in the app.`,
+      };
+    }
+
     if (key === 'privacy-policy') {
       return {
         title: 'Privacy Policy',

@@ -476,5 +476,27 @@ describe('OrderService Billing Calculations', () => {
         }),
       );
     });
+
+    it('should sanitize legacy Rs. 20 notes to actual discount amount in enrichOrderWithBillingDetails', () => {
+      const orderWithLegacyNote = {
+        id: 530,
+        orderNumber: 'ORD-00530',
+        totalAmount: 156.0,
+        discountAmount: 100.0,
+        taxAmount: 28.08,
+        netAmount: 89.08,
+        notes: 'Slot: 8 PM - 9 PM | Referral Qualified: 1st Order >10 clothes (Referrer gets Rs. 50) | Insurance: Not Selected | First Order Discount: Rs. 20 Applied | Payment Mode: Pay on Delivery (Cash / UPI) | Delivery: Free',
+        orderItems: [
+          { quantity: 4, clothType: 'Shirt', service: { serviceName: 'Ironing' } },
+          { quantity: 8, clothType: 'Pant', service: { serviceName: 'Ironing' } },
+        ],
+      };
+
+      const enriched = orderService.enrichOrderWithBillingDetails(orderWithLegacyNote);
+      expect(enriched.notes).toContain('First Order Discount: Rs. 100 Applied');
+      expect(enriched.notes).not.toContain('First Order Discount: Rs. 20 Applied');
+      expect(enriched.discountAmount).toBe(100.0);
+      expect(enriched.netAmount).toBe(89.08);
+    });
   });
 });

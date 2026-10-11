@@ -521,6 +521,19 @@ export class OrderService implements OnModuleInit {
         };
       }
 
+      // Synchronize First Order Discount note with true calculated bill.firstOrderDiscount
+      if (bill.firstOrderDiscount > 0) {
+        if (/First Order Discount:\s*Rs\.\s*[\d.]+\s*Applied/i.test(orderNotes)) {
+          orderNotes = orderNotes.replace(/First Order Discount:\s*Rs\.\s*[\d.]+\s*Applied/i, `First Order Discount: Rs. ${bill.firstOrderDiscount.toFixed(0)} Applied`);
+        } else {
+          orderNotes = orderNotes ? `${orderNotes} | First Order Discount: Rs. ${bill.firstOrderDiscount.toFixed(0)} Applied` : `First Order Discount: Rs. ${bill.firstOrderDiscount.toFixed(0)} Applied`;
+        }
+      } else if (/First Order Discount:\s*Rs\.\s*[\d.]+\s*Applied/i.test(orderNotes)) {
+        orderNotes = orderNotes.replace(/\|\s*First Order Discount:\s*Rs\.\s*[\d.]+\s*Applied/i, '')
+                               .replace(/First Order Discount:\s*Rs\.\s*[\d.]+\s*Applied\s*\|?/i, '')
+                               .trim();
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -663,8 +676,15 @@ export class OrderService implements OnModuleInit {
       }
     }
 
+    // Sanitize any legacy "First Order Discount: Rs. 20 Applied" notes if actual discount was >= Rs. 50
+    let sanitizedNotes = order.notes;
+    if (sanitizedNotes && /First Order Discount:\s*Rs\.\s*20\s*Applied/i.test(sanitizedNotes) && discountAmount >= 50) {
+      sanitizedNotes = sanitizedNotes.replace(/First Order Discount:\s*Rs\.\s*20\s*Applied/i, `First Order Discount: Rs. ${discountAmount.toFixed(0)} Applied`);
+    }
+
     return {
       ...order,
+      notes: sanitizedNotes,
       platformFee,
       deliveryCharge,
       insuranceCharge,

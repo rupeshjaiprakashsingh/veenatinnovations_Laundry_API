@@ -148,6 +148,15 @@ export class LegalService implements OnModuleInit {
           },
         });
         this.logger.log(`Migrated address for legal content key ${k} in database.`);
+      } else if (k === 'about-grivana' && existing.content && !existing.content.includes('Porwal Nivas')) {
+        await this.prisma.legalContent.update({
+          where: { key: k },
+          data: {
+            content: def.content,
+            updatedDate: new Date(),
+          },
+        });
+        this.logger.log(`Updated about-grivana with registered office address in database.`);
       }
     }
   }
@@ -180,7 +189,12 @@ Grivana Laundry Service is an app based platform that makes laundry and ironing 
 • Customers receive a code confirming successful delivery.
 
 5. Tracking 📍
-• Every step—from pickup to laundry shop to final delivery—is tracked in the app for transparency.`,
+• Every step—from pickup to laundry shop to final delivery—is tracked in the app for transparency.
+
+📍 Registered Office & Operating Hub
+Shri Hastimal Nathamal, Shop 1, Porwal Nivas, Bhattipada Road, Bhandup, Mumbai - 400078
+• Operated by Saimorphix Innovations LLP (LLPIN: ADA-0394)
+• Support: +91 83698 12313 | support@grivana.com`,
       };
     }
 

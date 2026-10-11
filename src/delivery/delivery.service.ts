@@ -224,25 +224,40 @@ export class DeliveryService {
           },
         });
 
-        // Record Payment with accurate payment mode (preserves Google Pay / UPI if selected on order)
-        let resolvedPaymentMode = dto.paymentMode || 'Cash';
-        if (!dto.paymentMode && order.notes) {
+        // Record Payment with accurate payment mode (preserves Google Pay / UPI / Razorpay if selected on order)
+        let resolvedPaymentMode = dto.paymentMode;
+        if (resolvedPaymentMode === 'Razorpay') {
+          resolvedPaymentMode = 'UPI (Razorpay)';
+        }
+
+        if (!resolvedPaymentMode && order.notes) {
           const notesLower = order.notes.toLowerCase();
-          if (notesLower.includes('gpay') || notesLower.includes('google pay')) {
+          if (notesLower.includes('razorpay')) {
+            resolvedPaymentMode = 'UPI (Razorpay)';
+          } else if (notesLower.includes('gpay') || notesLower.includes('google pay')) {
             resolvedPaymentMode = 'GPay';
           } else if (notesLower.includes('upi') || notesLower.includes('online')) {
             resolvedPaymentMode = 'UPI';
           }
+        }
+        if (!resolvedPaymentMode) {
+          resolvedPaymentMode = 'Cash';
         }
 
         const existingPayment = await tx.payment.findFirst({
           where: { orderId: delivery.orderId },
         });
         if (existingPayment) {
+          const finalMode = dto.paymentMode
+            ? (dto.paymentMode === 'Razorpay' ? 'UPI (Razorpay)' : dto.paymentMode)
+            : (existingPayment.paymentMode && existingPayment.paymentMode !== 'Cash'
+                ? (existingPayment.paymentMode === 'Razorpay' ? 'UPI (Razorpay)' : existingPayment.paymentMode)
+                : resolvedPaymentMode);
+
           await tx.payment.update({
             where: { id: existingPayment.id },
             data: {
-              paymentMode: dto.paymentMode || (existingPayment.paymentMode === 'Cash' && resolvedPaymentMode !== 'Cash' ? resolvedPaymentMode : existingPayment.paymentMode),
+              paymentMode: finalMode,
               paymentStatus: 'Paid',
               paidDate: new Date(),
             },

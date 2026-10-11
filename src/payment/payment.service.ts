@@ -24,6 +24,8 @@ export class PaymentService {
   async create(createPaymentDto: CreatePaymentDto) {
     const { orderId, amount, paymentMode, transactionReference } = createPaymentDto;
 
+    const normalizedPaymentMode = paymentMode === 'Razorpay' ? 'UPI (Razorpay)' : paymentMode;
+
     const order: any = await this.orderRepository.findDetailed(orderId);
     if (!order) throw new NotFoundException(`Order with ID ${orderId} not found`);
 
@@ -33,7 +35,7 @@ export class PaymentService {
         data: {
           orderId,
           amount,
-          paymentMode,
+          paymentMode: normalizedPaymentMode,
           transactionReference,
           paymentStatus: 'Completed',
         },

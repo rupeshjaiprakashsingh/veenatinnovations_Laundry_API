@@ -55,7 +55,7 @@ describe('OrderService Billing Calculations', () => {
         { provide: CustomerRepository, useValue: customerRepositoryMock },
         { provide: BranchRepository, useValue: {} },
         { provide: PrismaService, useValue: prismaMock },
-        { provide: NotificationSenderService, useValue: { sendOrderCreatedEmail: jest.fn() } },
+        { provide: NotificationSenderService, useValue: { sendOrderCreatedEmail: jest.fn(), sendPaymentReceivedEmail: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
 
@@ -351,5 +351,130 @@ describe('OrderService Billing Calculations', () => {
     });
 
     expect(result.taxAmount).toBe(18.0);
+  });
+
+  describe('Payment Mode Normalization & Preservation Regression Tests', () => {
+    it('should normalize Razorpay to UPI (Razorpay) when updating payment status', async () => {
+      const orderMock = {
+        id: 101,
+        orderNumber: 'ORD-00101',
+        totalAmount: 100,
+        taxAmount: 5,
+        discountAmount: 0,
+        netAmount: 135,
+        notes: 'Priority: No',
+        customer: { email: 'test@example.com', firstName: 'John' },
+      };
+
+      prismaMock.order.findUnique = jest.fn().mockResolvedValue(orderMock);
+      prismaMock.payment = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 1, paymentMode: 'UPI (Razorpay)' }),
+        update: jest.fn().mockResolvedValue({ id: 1, paymentMode: 'UPI (Razorpay)' }),
+      };
+
+      const orderRepoMock = {
+        update: jest.fn().mockResolvedValue(orderMock),
+      };
+      (orderService as any).orderRepository = orderRepoMock;
+
+      await orderService.updatePaymentStatus(101, {
+        paymentStatus: 'Paid',
+        paymentMode: 'Razorpay',
+      });
+
+      expect(prismaMock.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentMode: 'UPI (Razorpay)',
+            paymentStatus: 'Paid',
+          }),
+        }),
+      );
+    });
+
+    it('should preserve existing UPI (Razorpay) payment mode instead of falling back to Cash', async () => {
+      const orderMock = {
+        id: 102,
+        orderNumber: 'ORD-00102',
+        totalAmount: 100,
+        taxAmount: 5,
+        discountAmount: 0,
+        netAmount: 135,
+        notes: 'Payment Mode: Razorpay | Txn Ref: pay_123',
+        customer: { email: 'test@example.com', firstName: 'John' },
+      };
+
+      const existingPaymentMock = {
+        id: 5,
+        orderId: 102,
+        paymentMode: 'UPI (Razorpay)',
+        paymentStatus: 'Pending',
+      };
+
+      prismaMock.order.findUnique = jest.fn().mockResolvedValue(orderMock);
+      prismaMock.payment = {
+        findFirst: jest.fn().mockResolvedValue(existingPaymentMock),
+        update: jest.fn().mockResolvedValue({ ...existingPaymentMock, paymentStatus: 'Paid' }),
+        create: jest.fn(),
+      };
+
+      const orderRepoMock = {
+        update: jest.fn().mockResolvedValue(orderMock),
+      };
+      (orderService as any).orderRepository = orderRepoMock;
+
+      // Updating payment status without specifying paymentMode
+      await orderService.updatePaymentStatus(102, {
+        paymentStatus: 'Paid',
+      });
+
+      expect(prismaMock.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentMode: 'UPI (Razorpay)',
+            paymentStatus: 'Paid',
+          }),
+        }),
+      );
+    });
+
+    it('should resolve UPI (Razorpay) from notes if paymentMode is omitted and no prior payment exists', async () => {
+      const orderMock = {
+        id: 103,
+        orderNumber: 'ORD-00103',
+        totalAmount: 100,
+        taxAmount: 5,
+        discountAmount: 0,
+        netAmount: 135,
+        notes: 'Payment Mode: Razorpay | Txn Ref: pay_TmWCFJXsxk4eAO',
+        customer: { email: 'test@example.com', firstName: 'John' },
+      };
+
+      prismaMock.order.findUnique = jest.fn().mockResolvedValue(orderMock);
+      prismaMock.payment = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 2 }),
+        update: jest.fn(),
+      };
+
+      const orderRepoMock = {
+        update: jest.fn().mockResolvedValue(orderMock),
+      };
+      (orderService as any).orderRepository = orderRepoMock;
+
+      await orderService.updatePaymentStatus(103, {
+        paymentStatus: 'Paid',
+      });
+
+      expect(prismaMock.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentMode: 'UPI (Razorpay)',
+            paymentStatus: 'Paid',
+          }),
+        }),
+      );
+    });
   });
 });

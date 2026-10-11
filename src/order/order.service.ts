@@ -464,6 +464,10 @@ export class OrderService implements OnModuleInit {
       let resolvedPaidAmount = createOrderDto.paidAmount;
       let resolvedTxnRef = createOrderDto.transactionReference;
 
+      if (resolvedPaymentMode === 'Razorpay') {
+        resolvedPaymentMode = 'UPI (Razorpay)';
+      }
+
       // Also inspect orderNotes for credit deduction or instant payment
       if (!resolvedPaymentMode && orderNotes) {
         if (orderNotes.includes('Grivana Credits (100% Covered)') || orderNotes.includes('Payment Mode: Grivana Credits')) {
@@ -471,6 +475,12 @@ export class OrderService implements OnModuleInit {
           resolvedPaidAmount = bill.finalPayable;
         } else if (orderNotes.includes('Payment Mode: GPay') || orderNotes.includes('Payment Mode: Google Pay')) {
           resolvedPaymentMode = 'Google Pay / UPI';
+          resolvedPaidAmount = bill.finalPayable;
+        } else if (orderNotes.includes('Payment Mode: Razorpay') || orderNotes.includes('Payment Mode: UPI (Razorpay)')) {
+          resolvedPaymentMode = 'UPI (Razorpay)';
+          resolvedPaidAmount = bill.finalPayable;
+        } else if (orderNotes.includes('Payment Mode: UPI')) {
+          resolvedPaymentMode = 'UPI';
           resolvedPaidAmount = bill.finalPayable;
         }
       }
@@ -743,9 +753,27 @@ export class OrderService implements OnModuleInit {
 
     const updated = await this.orderRepository.update(id, { paymentStatus: dto.paymentStatus });
 
-    const mode = dto.paymentMode || 'Cash';
+    let mode = dto.paymentMode;
+    if (mode === 'Razorpay') {
+      mode = 'UPI (Razorpay)';
+    }
+
     if (dto.paymentStatus === 'Paid' || dto.paymentStatus === 'PAID') {
       const existingPayment = await this.prisma.payment.findFirst({ where: { orderId: id } });
+      if (!mode) {
+        if (existingPayment?.paymentMode && existingPayment.paymentMode !== 'Cash') {
+          mode = existingPayment.paymentMode === 'Razorpay' ? 'UPI (Razorpay)' : existingPayment.paymentMode;
+        } else if (order.notes) {
+          const notesLower = order.notes.toLowerCase();
+          if (notesLower.includes('razorpay')) mode = 'UPI (Razorpay)';
+          else if (notesLower.includes('gpay')) mode = 'GPay';
+          else if (notesLower.includes('upi')) mode = 'UPI';
+          else mode = 'Cash';
+        } else {
+          mode = 'Cash';
+        }
+      }
+
       if (existingPayment) {
         await this.prisma.payment.update({
           where: { id: existingPayment.id },

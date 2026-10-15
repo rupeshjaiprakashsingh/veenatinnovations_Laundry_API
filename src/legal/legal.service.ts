@@ -299,8 +299,10 @@ You must provide accurate mobile number and address details. You are responsible
 • Orders can be cancelled free of charge before pickup boy is dispatched or up to 2 hours before the scheduled pickup slot.
 • Refunds for pre-paid cancelled orders are credited back to the original payment source within 5-7 business days.
 
-7. Limitation of Liability
-Grivana and its partners take utmost care of all garments. Liability for any unforeseen damage or loss during processing is subject to standard laundry industry guidelines and terms of service.
+7. Garment Care, Order Protection & Liability
+• Grivana and its partners take utmost care of all garments. Liability for any unforeseen damage or loss during processing is subject to standard laundry industry guidelines and terms of service.
+• Order Protection Plan: Monthly Plan (₹250 / month) and Yearly Plan (₹999 / year) provide coverage up to ₹500 per garment for eligible everyday clothes. Coverage includes eligible damages, losses, or transit incidents, strictly as defined under policy guidelines. Refunds or claims are processed subject to policy guidelines and exclusions.
+• High Value Handling: Customers must disclose high-value garments at pickup. An additional premium applies, with extended coverage ranging from ₹1,000 to ₹3,000 per garment, subject to declaration and proof of valuation.
 
 8. Grievance Redressal Officer
 In accordance with Information Technology Act, 2000 & Consumer Protection Rules, 2020:

@@ -343,4 +343,19 @@ model LegalContent {
   @@map("legal_contents")
 }
 
+model PricingRule {
+  id               Int      @id @default(autoincrement())
+  ruleType         String   @default("DELIVERY") // DELIVERY, SURGE, MIN_ORDER
+  conditionClothes String   @default("< 10")    // "< 10" or ">= 10" or "ANY"
+  conditionValue   String   @default("<= 300")  // "<= 300", "> 300", "ANY"
+  deliveryCharge   Float    @default(30.0)
+  description      String?
+  isActive         Boolean  @default(true)
+  createdDate      DateTime @default(now())
+  updatedDate      DateTime @updatedAt
+
+  @@map("pricing_rules")
+}
+
+
 

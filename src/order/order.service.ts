@@ -15,6 +15,91 @@ export class OrderService implements OnModuleInit {
     private readonly notificationSender: NotificationSenderService,
   ) {}
 
+  /**
+   * Calculates delivery charge:
+   * - If clothes < 10 and orderValue > 300: 0 (Free delivery)
+   * - If clothes < 10 and orderValue <= 300: 30 (Standard charge)
+   * - If clothes >= 10: 0 (Free delivery)
+   */
+  public static calculateDeliveryCharge(clothesCount: number, orderValue: number): number {
+    const minClothes = parseInt(process.env.DELIVERY_FREE_MIN_CLOTHES || '10', 10);
+    const minOrderValue = parseFloat(process.env.DELIVERY_FREE_MIN_ORDER_VALUE || '300');
+    const standardFee = parseFloat(process.env.DELIVERY_STANDARD_FEE || '30');
+
+    if (clothesCount < minClothes) {
+      if (orderValue > minOrderValue) {
+        return 0.0; // Free delivery for high-value small orders (> ₹300)
+      } else {
+        return standardFee; // Standard charge for small, low-value orders (<= ₹300)
+      }
+    } else {
+      return 0.0; // Free delivery for 10 or more clothes
+    }
+  }
+
+  public static evaluateRuleCondition(
+    clothesCount: number,
+    orderValue: number,
+    conditionClothes: string,
+    conditionValue: string,
+  ): boolean {
+    const parseCondition = (val: number, cond: string): boolean => {
+      const c = (cond || '').trim().toUpperCase();
+      if (c === 'ANY' || c === '' || c === '*') return true;
+      if (c.startsWith('<=')) return val <= parseFloat(c.replace('<=', '').trim());
+      if (c.startsWith('>=')) return val >= parseFloat(c.replace('>=', '').trim());
+      if (c.startsWith('<')) return val < parseFloat(c.replace('<', '').trim());
+      if (c.startsWith('>')) return val > parseFloat(c.replace('>', '').trim());
+      if (c.startsWith('=')) return val === parseFloat(c.replace('=', '').trim());
+      return false;
+    };
+
+    return parseCondition(clothesCount, conditionClothes) && parseCondition(orderValue, conditionValue);
+  }
+
+  /**
+   * Option 2: Bundled GST Billing
+   * Combines all components into one "service package" (Laundry + Platform Fee + Delivery Fee)
+   * before applying GST (default 18%).
+   */
+  public static calculateBundledGst(
+    subtotal: number,
+    platformFee: number,
+    deliveryFee: number,
+    gstRatePercent: number = 18,
+  ): { taxableBase: number; taxAmount: number } {
+    const taxableBase = parseFloat((subtotal + platformFee + deliveryFee).toFixed(2));
+    const taxAmount = parseFloat((taxableBase * (gstRatePercent / 100)).toFixed(2));
+    return { taxableBase, taxAmount };
+  }
+
+  /**
+   * Resolves delivery charge using database pricing rules table when available,
+   * with automatic fallback to static rule logic.
+   */
+  async getDeliveryChargeFromRules(clothesCount: number, orderValue: number): Promise<number> {
+    try {
+      if (this.prisma && (this.prisma as any).pricingRule) {
+        const rules = await (this.prisma as any).pricingRule.findMany({
+          where: { ruleType: 'DELIVERY', isActive: true },
+          orderBy: { id: 'asc' },
+        });
+
+        if (rules && rules.length > 0) {
+          for (const rule of rules) {
+            if (OrderService.evaluateRuleCondition(clothesCount, orderValue, rule.conditionClothes, rule.conditionValue)) {
+              return rule.deliveryCharge;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Graceful fallback to static rule logic
+    }
+
+    return OrderService.calculateDeliveryCharge(clothesCount, orderValue);
+  }
+
   async onModuleInit() {
     // Auto-seed default time slots if table is empty
     const count = await this.prisma.timeSlot.count();
@@ -33,6 +118,46 @@ export class OrderService implements OnModuleInit {
         })),
       });
       console.log('Seeded default time slots.');
+    }
+
+    // Auto-seed default pricing rules if table is empty
+    try {
+      if ((this.prisma as any).pricingRule) {
+        const ruleCount = await (this.prisma as any).pricingRule.count();
+        if (ruleCount === 0) {
+          await (this.prisma as any).pricingRule.createMany({
+            data: [
+              {
+                ruleType: 'DELIVERY',
+                conditionClothes: '< 10',
+                conditionValue: '<= 300',
+                deliveryCharge: 30.0,
+                description: 'Small order, low value',
+                isActive: true,
+              },
+              {
+                ruleType: 'DELIVERY',
+                conditionClothes: '< 10',
+                conditionValue: '> 300',
+                deliveryCharge: 0.0,
+                description: 'Small order, high value',
+                isActive: true,
+              },
+              {
+                ruleType: 'DELIVERY',
+                conditionClothes: '>= 10',
+                conditionValue: 'ANY',
+                deliveryCharge: 0.0,
+                description: 'Large order free delivery',
+                isActive: true,
+              },
+            ],
+          });
+          console.log('Seeded default pricing rules.');
+        }
+      }
+    } catch (e) {
+      // Gracefully continue if unmigrated in database
     }
   }
 
@@ -127,11 +252,6 @@ export class OrderService implements OnModuleInit {
 
     const platformFee = 5.0;
 
-    // Configurable GST/Tax Rate (default 18%)
-    const gstRatePercent = parseFloat(process.env.GST_RATE || '18');
-    const gstRate = gstRatePercent / 100;
-    const taxAmount = parseFloat((subtotal * gstRate).toFixed(2));
-
     const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
     const orderCount = await this.prisma.order.count({ where: { customerId } });
     const isFirstOrder = orderCount === 0;
@@ -147,17 +267,26 @@ export class OrderService implements OnModuleInit {
 
     // Universal Delivery Rule:
     // For Grivana Priority: Delivery charges will ALWAYS apply (₹30.00), whether 1 cloth or 20 clothes.
-    // For Standard service: Below 10 clothes – delivery will be charged ₹30.00; 10 or more clothes – delivery is FREE (₹0.00).
-    const deliveryCharge = isPriorityOrder ? 30.0 : (totalQuantity >= 10 ? 0.0 : 30.0);
-    const freeDeliverySaving = isPriorityOrder ? 0.0 : (totalQuantity >= 10 ? 30.0 : 0.0);
+    // For Standard service: 
+    // - 10 or more clothes: Delivery is FREE (₹0.00)
+    // - Less than 10 clothes BUT Order Value (subtotal) > ₹300: Delivery is FREE (₹0.00)
+    // - Less than 10 clothes AND Order Value (subtotal) <= ₹300: Delivery is charged ₹30.00
+    const standardDeliveryCharge = await this.getDeliveryChargeFromRules(totalQuantity, subtotal);
+    const deliveryCharge = isPriorityOrder ? 30.0 : standardDeliveryCharge;
+    const freeDeliverySaving = isPriorityOrder ? 0.0 : (standardDeliveryCharge === 0.0 ? 30.0 : 0.0);
+
+    // Option 2: Bundled GST Billing
+    // Combines all components into one "service package" (Laundry subtotal + Platform Fee + Delivery Fee) before applying GST (default 18%)
+    const gstRatePercent = parseFloat(process.env.GST_RATE || '18');
+    const { taxableBase, taxAmount } = OrderService.calculateBundledGst(subtotal, platformFee, deliveryCharge, gstRatePercent);
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;
     if (insuranceOpted && !hasActiveInsurance) {
       if (insuranceType === 'MONTHLY') {
-        insuranceCharge = 50.0;
+        insuranceCharge = 250.0;
       } else {
-        insuranceCharge = 500.0; // YEARLY
+        insuranceCharge = 999.0; // YEARLY
       }
     }
 
@@ -214,6 +343,7 @@ export class OrderService implements OnModuleInit {
     return {
       subtotal: parseFloat(subtotal.toFixed(2)),
       platformFee,
+      taxableBase,
       taxAmount,
       deliveryCharge,
       insuranceCharge,
@@ -644,8 +774,9 @@ export class OrderService implements OnModuleInit {
         })) ||
       (order.notes && order.notes.toLowerCase().includes('priority'));
 
-    const deliveryCharge = isPriorityOrder ? 30.0 : (totalQuantity >= 10 ? 0.0 : 30.0);
-    const freeDeliverySaving = isPriorityOrder ? 0.0 : (totalQuantity >= 10 ? 30.0 : 0.0);
+    const standardDeliveryCharge = OrderService.calculateDeliveryCharge(totalQuantity, subtotal);
+    const deliveryCharge = isPriorityOrder ? 30.0 : standardDeliveryCharge;
+    const freeDeliverySaving = isPriorityOrder ? 0.0 : (standardDeliveryCharge === 0.0 ? 30.0 : 0.0);
 
     // Reconstruct insurance charge
     const reconstructedInsurance = netAmount - subtotal - taxAmount - platformFee - deliveryCharge + discountAmount;
@@ -686,6 +817,7 @@ export class OrderService implements OnModuleInit {
       ...order,
       notes: sanitizedNotes,
       platformFee,
+      taxableBase: parseFloat((subtotal + platformFee + deliveryCharge).toFixed(2)),
       deliveryCharge,
       insuranceCharge,
       couponCode,

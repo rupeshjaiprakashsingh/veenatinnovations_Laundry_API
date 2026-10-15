@@ -140,11 +140,11 @@ describe('OrderService Billing Calculations', () => {
     // Bundled Taxable Base = 1000 + 5.0 + 0 = 1005.0
     // GST (5%) = 1005 * 0.05 = 50.25
     // Free delivery saving = 30.0
-    // First order discount = 50.0 (quantity > 5)
+    // First order discount = 100.0 (subtotal > 600)
     // Gross total = 1005 + 50.25 = 1055.25
-    // Net amount = 1055.25 - 50 = 1005.25
-    // Final payable = 1005.25
-    // Total savings = 30.0 (free delivery saving) + 50.0 (first order discount) = 80.0
+    // Net amount = 1055.25 - 100 = 955.25
+    // Final payable = 955.25
+    // Total savings = 30.0 (free delivery saving) + 100.0 (first order discount) = 130.0
 
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
@@ -157,8 +157,8 @@ describe('OrderService Billing Calculations', () => {
     expect(result.deliveryCharge).toBe(0.0);
     expect(result.taxableBase).toBe(1005.0);
     expect(result.taxAmount).toBe(50.25);
-    expect(result.totalSavings).toBe(80.0);
-    expect(result.finalPayable).toBe(1005.25);
+    expect(result.totalSavings).toBe(130.0);
+    expect(result.finalPayable).toBe(955.25);
   });
 
   it('should apply free delivery when clothes count < 10 but order value is greater than 300', async () => {
@@ -428,7 +428,7 @@ describe('OrderService Billing Calculations', () => {
 
     serviceRepositoryMock.findById.mockResolvedValue({
       id: 1,
-      serviceName: 'Dry Clean Coat',
+      serviceName: 'Standard Press Coat',
       price: 100.0,
       isActive: true,
     });
@@ -505,7 +505,7 @@ describe('OrderService Billing Calculations', () => {
 
       serviceRepositoryMock.findById.mockResolvedValue({
         id: 1,
-        serviceName: 'Dry Cleaning Kurta',
+        serviceName: 'Standard Ironing Kurta',
         price: 42.0,
         isActive: true,
       });
@@ -691,6 +691,113 @@ describe('OrderService Billing Calculations', () => {
       expect(enriched.notes).not.toContain('First Order Discount: Rs. 20 Applied');
       expect(enriched.discountAmount).toBe(100.0);
       expect(enriched.netAmount).toBe(89.08);
+    });
+
+    describe('First Order Discount Rules (Above ₹300 & Dry Cleaning & Quantity)', () => {
+      it('should apply ₹50 discount for 1 dry cleaning coat (subtotal ₹400 > 300, quantity 1)', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Dry Clean Suit', price: 400.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 400.0 });
+        prismaMock.order.count.mockResolvedValue(0);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Suit', quantity: 1 }],
+        });
+
+        expect(result.firstOrderDiscount).toBe(50.0);
+        expect(result.deliveryCharge).toBe(0.0); // > 300 free delivery
+        // Bundled Base: 400 + 5 = 405. GST 18%: 72.90. Gross: 477.90
+        expect(result.subtotal).toBe(400.0);
+        expect(result.taxAmount).toBe(72.90);
+        expect(result.grossTotal).toBe(477.90);
+        expect(result.finalPayable).toBe(427.90); // 477.90 - 50 = 427.90
+        expect(result.totalSavings).toBe(80.0); // 30 (free delivery) + 50 (first order)
+      });
+
+      it('should apply ₹50 discount for 3 sarees roll press (subtotal ₹360 > 300, quantity 3 <= 5)', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Press / Ironing', price: 120.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 120.0 });
+        prismaMock.order.count.mockResolvedValue(0);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Saree - Roll Press', quantity: 3 }],
+        });
+
+        expect(result.firstOrderDiscount).toBe(50.0);
+        expect(result.deliveryCharge).toBe(0.0); // > 300 free delivery
+        // Bundled Base: 360 + 5 = 365. GST 18%: 65.70. Gross: 430.70
+        expect(result.subtotal).toBe(360.0);
+        expect(result.taxAmount).toBe(65.70);
+        expect(result.grossTotal).toBe(430.70);
+        expect(result.finalPayable).toBe(380.70); // 430.70 - 50 = 380.70
+        expect(result.totalSavings).toBe(80.0);
+      });
+
+      it('should apply ₹50 discount for dry cleaning even if subtotal <= 300 and quantity <= 5', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Dry Cleaning', price: 150.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 150.0 });
+        prismaMock.order.count.mockResolvedValue(0);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Shirt (Dry Clean)', quantity: 1 }],
+        });
+
+        expect(result.firstOrderDiscount).toBe(50.0);
+      });
+
+      it('should apply ₹100 discount for first order with subtotal > 600 even if quantity <= 10', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Dry Cleaning', price: 350.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 350.0 });
+        prismaMock.order.count.mockResolvedValue(0);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Heavy Lehenga', quantity: 2 }],
+        });
+
+        expect(result.subtotal).toBe(700.0);
+        expect(result.firstOrderDiscount).toBe(100.0);
+      });
+
+      it('should apply ₹0 discount for standard order <= 5 clothes and subtotal <= 300 without dry cleaning', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Ironing', price: 20.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 20.0 });
+        prismaMock.order.count.mockResolvedValue(0);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Shirt', quantity: 3 }],
+        });
+
+        expect(result.firstOrderDiscount).toBe(0.0);
+      });
+
+      it('should apply ₹0 discount when not first order (order count > 0)', async () => {
+        customerRepositoryMock.findById.mockResolvedValue({ id: 1, insuranceExpiry: null });
+        serviceRepositoryMock.findById.mockResolvedValue({ id: 1, serviceName: 'Dry Cleaning', price: 500.0, isActive: true });
+        prismaMock.service.findUnique.mockResolvedValue({ id: 1, price: 500.0 });
+        prismaMock.order.count.mockResolvedValue(2);
+
+        const result = await orderService.calculateOrderBillDetails({
+          customerId: 1,
+          branchId: 1,
+          orderItems: [{ serviceId: 1, clothType: 'Coat', quantity: 1 }],
+        });
+
+        expect(result.firstOrderDiscount).toBe(0.0);
+      });
     });
   });
 });

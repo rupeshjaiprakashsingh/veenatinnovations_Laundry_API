@@ -74,6 +74,27 @@ export class OrderService implements OnModuleInit {
   }
 
   /**
+   * First Order Discount calculation:
+   * - Tier 1: > 10 clothes OR order value > ₹600 -> ₹100 discount
+   * - Tier 2: > 5 clothes OR order value > ₹300 OR dry cleaning -> ₹50 discount
+   * - Otherwise: ₹0
+   */
+  public static calculateFirstOrderDiscount(
+    isFirstOrder: boolean,
+    totalQuantity: number,
+    subtotal: number,
+    hasDryCleaning: boolean = false,
+  ): number {
+    if (!isFirstOrder) return 0.0;
+    if (totalQuantity > 10 || subtotal > 600.0) {
+      return 100.0;
+    } else if (totalQuantity > 5 || subtotal > 300.0 || hasDryCleaning) {
+      return 50.0;
+    }
+    return 0.0;
+  }
+
+  /**
    * Resolves delivery charge using database pricing rules table when available,
    * with automatic fallback to static rule logic.
    */
@@ -290,14 +311,19 @@ export class OrderService implements OnModuleInit {
       }
     }
 
-    let firstOrderDiscount = 0.0;
-    if (isFirstOrder) {
-      if (totalQuantity > 10) {
-        firstOrderDiscount = 100.0;
-      } else if (totalQuantity > 5) {
-        firstOrderDiscount = 50.0;
-      }
-    }
+    const hasDryCleaning = resolvedItems.some(item => {
+      const sName = (item.serviceName || '').toLowerCase();
+      const sType = (item.serviceType || '').toLowerCase();
+      const cType = (item.clothType || '').toLowerCase();
+      return sName.includes('dry') || sType.includes('dry') || cType.includes('dry');
+    });
+
+    const firstOrderDiscount = OrderService.calculateFirstOrderDiscount(
+      isFirstOrder,
+      totalQuantity,
+      subtotal,
+      hasDryCleaning,
+    );
 
     let referralDiscount = 0.0;
     const pendingRefereeReferral = await this.prisma.referral.findUnique({
@@ -560,8 +586,8 @@ export class OrderService implements OnModuleInit {
         });
       }
 
-      // If referred customer places their 1st order with >10 clothes, award ₹100 to referrer
-      if (isFirstOrder && totalQuantity > 10) {
+      // If referred customer places their 1st order with >10 clothes or subtotal > 600, award ₹100 to referrer
+      if (isFirstOrder && (totalQuantity > 10 || bill.subtotal > 600.0)) {
         const refRecord = await tx.referral.findUnique({
           where: { referredId: customerId },
         });

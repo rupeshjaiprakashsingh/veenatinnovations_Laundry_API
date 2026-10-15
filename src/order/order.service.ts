@@ -274,7 +274,12 @@ export class OrderService implements OnModuleInit {
     const platformFee = 5.0;
 
     const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-    const orderCount = await this.prisma.order.count({ where: { customerId } });
+    const orderCount = await this.prisma.order.count({
+      where: {
+        customerId,
+        orderStatus: { notIn: ['Cancelled', 'Failed'] },
+      },
+    });
     const isFirstOrder = orderCount === 0;
 
     const isPriorityOrder =
@@ -531,7 +536,12 @@ export class OrderService implements OnModuleInit {
     let referralToUpdateReferrerId: number | null = null;
 
     const totalQuantity = (createOrderDto.orderItems || []).reduce((sum, item) => sum + item.quantity, 0);
-    const existingOrdersCount = await this.prisma.order.count({ where: { customerId } });
+    const existingOrdersCount = await this.prisma.order.count({
+      where: {
+        customerId,
+        orderStatus: { notIn: ['Cancelled', 'Failed'] },
+      },
+    });
     const isFirstOrder = existingOrdersCount === 0;
 
     if (bill.referralDiscount > 0) {

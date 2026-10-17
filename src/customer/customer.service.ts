@@ -12,22 +12,25 @@ export class CustomerService {
 
   async findAll() {
     const customers = await this.customerRepository.findAll();
-    const knownPincodes = ['400614', '400078', '400001', '400706', '400705', '400703'];
     return Promise.all(
       customers.map(async (c) => {
-        let isServiceable = true;
+        // Default to false — customer has no pincode or no configured service
+        let isServiceable = false;
         if (c.pincode) {
           const cleanP = c.pincode.trim();
-          if (knownPincodes.includes(cleanP)) {
+          // Same logic as checkServiceability() in service.service.ts (Android-compatible)
+          // 1. Check for active laundry shop at this pincode
+          const shop = await this.prisma.laundryShop.findFirst({
+            where: { pincode: cleanP, isActive: true },
+          });
+          if (shop) {
             isServiceable = true;
           } else {
-            const shop = await this.prisma.laundryShop.findFirst({
-              where: { pincode: cleanP, isActive: true },
-            });
+            // 2. Check for active service price at this pincode (exclude DEFAULT fallback)
             const price = await this.prisma.servicePrice.findFirst({
-              where: { pincode: cleanP, isActive: true },
+              where: { pincode: cleanP, isActive: true, NOT: { pincode: 'DEFAULT' } },
             });
-            isServiceable = !!(shop || price);
+            isServiceable = !!price;
           }
         }
         return {

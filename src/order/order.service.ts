@@ -74,6 +74,68 @@ export class OrderService implements OnModuleInit {
   }
 
   /**
+   * Inclusive Pricing Model (Document Page 1, 2 & 3)
+   * Formula: Taxable Value = Price ÷ (1 + GST%)
+   * GST Portion = Price − Taxable Value
+   * Internal accounting back-calculation for tax-inclusive bills (Blinkit/Zepto model).
+   */
+  public static calculateInclusiveGst(
+    totalCollected: number,
+    gstRatePercent: number = 18,
+  ): { taxableBase: number; taxAmount: number } {
+    if (totalCollected <= 0) {
+      return { taxableBase: 0, taxAmount: 0 };
+    }
+    const divisor = 1 + gstRatePercent / 100;
+    const taxableBase = parseFloat((totalCollected / divisor).toFixed(2));
+    const taxAmount = parseFloat((totalCollected - taxableBase).toFixed(2));
+    return { taxableBase, taxAmount };
+  }
+
+  /**
+   * Hybrid Inclusive GST Compliance Split (Document Page 4 & 5)
+   * Splits internal accounting compliance between:
+   * 1. Laundry Service (5% GST slab): Taxable = Laundry ÷ 1.05, GST = Laundry - Taxable
+   * 2. Platform Fee + Delivery (18% GST slab): Taxable = (Platform+Delivery) ÷ 1.18, GST = (Platform+Delivery) - Taxable
+   */
+  public static calculateHybridInclusiveGst(
+    laundryTotal: number,
+    platformAndDeliveryTotal: number,
+    laundryGstPercent: number = 5,
+    platformGstPercent: number = 18,
+  ): {
+    laundryTaxable: number;
+    laundryGst: number;
+    platformTaxable: number;
+    platformGst: number;
+    totalTaxable: number;
+    totalGst: number;
+    grandTotal: number;
+  } {
+    const laundryDivisor = 1 + laundryGstPercent / 100;
+    const laundryTaxable = parseFloat((laundryTotal / laundryDivisor).toFixed(2));
+    const laundryGst = parseFloat((laundryTotal - laundryTaxable).toFixed(2));
+
+    const platformDivisor = 1 + platformGstPercent / 100;
+    const platformTaxable = parseFloat((platformAndDeliveryTotal / platformDivisor).toFixed(2));
+    const platformGst = parseFloat((platformAndDeliveryTotal - platformTaxable).toFixed(2));
+
+    const totalTaxable = parseFloat((laundryTaxable + platformTaxable).toFixed(2));
+    const totalGst = parseFloat((laundryGst + platformGst).toFixed(2));
+    const grandTotal = parseFloat((laundryTotal + platformAndDeliveryTotal).toFixed(2));
+
+    return {
+      laundryTaxable,
+      laundryGst,
+      platformTaxable,
+      platformGst,
+      totalTaxable,
+      totalGst,
+      grandTotal,
+    };
+  }
+
+  /**
    * First Order Discount calculation:
    * - Tier 1: > 10 clothes OR order value > ₹600 -> ₹100 discount
    * - Tier 2: > 5 clothes OR order value > ₹300 OR dry cleaning -> ₹50 discount

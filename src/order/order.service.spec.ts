@@ -799,5 +799,64 @@ describe('OrderService Billing Calculations', () => {
         expect(result.firstOrderDiscount).toBe(0.0);
       });
     });
+
+    describe('Tax-Inclusive Pricing & Compliance Model (Document Guidelines)', () => {
+      it('should calculate back-calculated inclusive GST for Zepto item ₹100 @ 5% (Document Page 1)', () => {
+        const result = OrderService.calculateInclusiveGst(100.0, 5);
+        expect(result.taxableBase).toBe(95.24);
+        expect(result.taxAmount).toBe(4.76);
+        expect(result.taxableBase + result.taxAmount).toBe(100.00);
+      });
+
+      it('should calculate back-calculated inclusive GST for laundry bill ₹72 @ 18% (Document Page 2)', () => {
+        const result = OrderService.calculateInclusiveGst(72.0, 18);
+        expect(result.taxableBase).toBe(61.02);
+        expect(result.taxAmount).toBe(10.98);
+        expect(result.taxableBase + result.taxAmount).toBe(72.00);
+      });
+
+      it('should calculate back-calculated inclusive GST for exact ₹71.98 @ 18%', () => {
+        const result = OrderService.calculateInclusiveGst(71.98, 18);
+        expect(result.taxableBase).toBe(61.00);
+        expect(result.taxAmount).toBe(10.98);
+        expect(result.taxableBase + result.taxAmount).toBe(71.98);
+      });
+
+      it('should handle zero or negative amounts gracefully', () => {
+        const zeroResult = OrderService.calculateInclusiveGst(0, 18);
+        expect(zeroResult.taxableBase).toBe(0);
+        expect(zeroResult.taxAmount).toBe(0);
+
+        const negativeResult = OrderService.calculateInclusiveGst(-50, 18);
+        expect(negativeResult.taxableBase).toBe(0);
+        expect(negativeResult.taxAmount).toBe(0);
+      });
+
+      it('should calculate hybrid compliance split matching Document Page 5 (Ironing 5% + Platform/Delivery 18%)', () => {
+        // Document Page 5:
+        // Ironing Service (5% GST): Total = ₹26 -> Taxable = ₹24.76, GST @ 5% = ₹1.24
+        // Platform Fee + Delivery (18% GST): Total = ₹60 -> Taxable = ₹50.85, GST @ 18% = ₹9.15
+        // GST Liability = 1.24 + 9.15 = 10.39
+        const hybrid = OrderService.calculateHybridInclusiveGst(26.0, 60.0, 5, 18);
+        expect(hybrid.laundryTaxable).toBe(24.76);
+        expect(hybrid.laundryGst).toBe(1.24);
+        expect(hybrid.platformTaxable).toBe(50.85);
+        expect(hybrid.platformGst).toBe(9.15);
+        expect(hybrid.totalGst).toBe(10.39);
+        expect(hybrid.grandTotal).toBe(86.00);
+      });
+
+      it('should calculate hybrid compliance split for ₹26 Ironing + ₹35 Platform & Delivery (Total ₹61)', () => {
+        const hybrid = OrderService.calculateHybridInclusiveGst(26.0, 35.0, 5, 18);
+        expect(hybrid.laundryTaxable).toBe(24.76);
+        expect(hybrid.laundryGst).toBe(1.24);
+        expect(hybrid.platformTaxable).toBe(29.66);
+        expect(hybrid.platformGst).toBe(5.34);
+        expect(hybrid.totalTaxable).toBe(54.42);
+        expect(hybrid.totalGst).toBe(6.58);
+        expect(hybrid.grandTotal).toBe(61.00);
+      });
+    });
   });
 });
+

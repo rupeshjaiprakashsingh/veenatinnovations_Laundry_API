@@ -74,7 +74,7 @@ export class OrderService implements OnModuleInit {
   }
 
   public static calculateFeeGst(platformFee: number, deliveryFee: number): number {
-    const platformGst = platformFee > 0 ? platformFee * 0.05 : 0;
+    const platformGst = platformFee > 0 ? platformFee * 0.18 : 0;
     const deliveryGst = deliveryFee > 0 ? deliveryFee * 0.18 : 0;
     return parseFloat((platformGst + deliveryGst).toFixed(2));
   }

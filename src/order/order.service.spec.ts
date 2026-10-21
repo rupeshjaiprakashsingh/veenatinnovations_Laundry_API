@@ -63,8 +63,8 @@ describe('OrderService Billing Calculations', () => {
   });
 
   it('calculates GST only on charged platform and delivery fees', () => {
-    expect(OrderService.calculateFeeGst(5, 30)).toBe(5.65);
-    expect(OrderService.calculateFeeGst(5, 0)).toBe(0.25);
+    expect(OrderService.calculateFeeGst(5, 30)).toBe(6.3);
+    expect(OrderService.calculateFeeGst(5, 0)).toBe(0.9);
     expect(OrderService.calculateFeeGst(0, 30)).toBe(5.4);
     expect(OrderService.calculateFeeGst(0, 0)).toBe(0);
   });
@@ -95,9 +95,9 @@ describe('OrderService Billing Calculations', () => {
     // Platform fee = 5.0
     // Delivery charge = 30.0 (Standard service < 10 clothes)
     // Bundled Taxable Base = 77.5 + 5.0 + 30.0 = 112.50
-    // Platform GST (5%) + delivery GST (18%) = 0.25 + 5.40 = 5.65
+    // Platform and delivery GST at 18% = 0.90 + 5.40 = 6.30
     // First order discount = 0.0 (quantity <= 5)
-    // Gross total = 112.50 + 5.65 = 118.15
+    // Gross total = 112.50 + 6.30 = 118.80
     // Net amount = 118.13
     // Final payable = 118.13
     // Round off = 0.0
@@ -116,10 +116,10 @@ describe('OrderService Billing Calculations', () => {
     expect(result.platformFee).toBe(5.0);
     expect(result.deliveryCharge).toBe(30.0);
     expect(result.taxableBase).toBe(112.50);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.grossTotal).toBe(118.15);
-    expect(result.netAmount).toBe(118.15);
-    expect(result.finalPayable).toBe(118.15);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.grossTotal).toBe(118.8);
+    expect(result.netAmount).toBe(118.8);
+    expect(result.finalPayable).toBe(118.8);
     expect(result.roundOff).toBe(0.0);
     expect(result.totalSavings).toBe(0.0);
   });
@@ -145,12 +145,12 @@ describe('OrderService Billing Calculations', () => {
     // Platform fee = 5.0
     // Delivery charge = 0.0 (standard order >= 10 clothes is FREE)
     // Bundled Taxable Base = 1000 + 5.0 + 0 = 1005.0
-    // Platform GST (5%) = 0.25; free delivery adds no delivery GST
+    // Platform GST at 18% = 0.90; free delivery adds no delivery GST
     // Free delivery saving = 30.0
     // First order discount = 100.0 (subtotal > 600)
-    // Gross total = 1005 + 0.25 = 1005.25
-    // Net amount = 1005.25 - 100 = 905.25
-    // Final payable = 905.25
+    // Gross total = 1005 + 0.90 = 1005.90
+    // Net amount = 1005.90 - 100 = 905.90
+    // Final payable = 905.90
     // Total savings = 30.0 (free delivery saving) + 100.0 (first order discount) = 130.0
 
     const result = await orderService.calculateOrderBillDetails({
@@ -163,9 +163,9 @@ describe('OrderService Billing Calculations', () => {
 
     expect(result.deliveryCharge).toBe(0.0);
     expect(result.taxableBase).toBe(1005.0);
-    expect(result.taxAmount).toBe(0.25);
+    expect(result.taxAmount).toBe(0.9);
     expect(result.totalSavings).toBe(130.0);
-    expect(result.finalPayable).toBe(905.25);
+    expect(result.finalPayable).toBe(905.9);
   });
 
   it('should apply free delivery when clothes count < 10 but order value is greater than 300', async () => {
@@ -297,9 +297,9 @@ describe('OrderService Billing Calculations', () => {
     });
 
     expect(result.taxableBase).toBe(45.0);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.grossTotal).toBe(50.65);
-    expect(result.totalDiscount).toBe(50.65);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.grossTotal).toBe(51.3);
+    expect(result.totalDiscount).toBe(51.3);
     expect(result.netAmount).toBe(0.0);
     expect(result.finalPayable).toBe(0.0);
   });
@@ -335,8 +335,8 @@ describe('OrderService Billing Calculations', () => {
     expect(result.deliveryCharge).toBe(30.0);
     // Platform GST (5%) + delivery GST (18%) = 5.65
     expect(result.taxableBase).toBe(60.0);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.finalPayable).toBe(65.65);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.finalPayable).toBe(66.3);
   });
 
   it('should always apply ₹30 delivery charge for Grivana Priority with 12 items (never free)', async () => {
@@ -379,9 +379,9 @@ describe('OrderService Billing Calculations', () => {
     expect(result.platformFee).toBe(5.0);
     expect(result.deliveryCharge).toBe(30.0);
     expect(result.taxableBase).toBe(227.0);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.grossTotal).toBe(232.65);
-    expect(result.finalPayable).toBe(232.65);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.grossTotal).toBe(233.3);
+    expect(result.finalPayable).toBe(233.3);
     expect(result.totalSavings).toBe(0.0); // NO free delivery savings
   });
 
@@ -419,12 +419,12 @@ describe('OrderService Billing Calculations', () => {
     expect(result.subtotal).toBe(400.0);
     // Bundled Taxable Base = 400 + 5 + 30 = 435.0. Tax (5%) = 21.75. Gross = 456.75
     expect(result.taxableBase).toBe(435.0);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.finalPayable).toBe(440.65);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.finalPayable).toBe(441.3);
     expect(result.totalSavings).toBe(0.0);
   });
 
-  it('should apply 5% platform GST and 18% delivery GST independently of GST_RATE', async () => {
+  it('should apply 18% GST to platform and delivery fees independently of GST_RATE', async () => {
     // Legacy GST_RATE does not override the fee-specific rates.
     process.env.GST_RATE = '18';
 
@@ -448,7 +448,7 @@ describe('OrderService Billing Calculations', () => {
     // Platform fee = 5.0
     // Delivery charge = 30.0 (< 10 clothes and subtotal 100 <= 300)
     // Bundled Taxable Base = 100.0 + 5.0 + 30.0 = 135.0
-    // Platform GST = 0.25; delivery GST = 5.40; total GST = 5.65.
+    // Platform GST = 0.90; delivery GST = 5.40; total GST = 6.30.
     const result = await orderService.calculateOrderBillDetails({
       customerId: 1,
       branchId: 1,
@@ -458,9 +458,9 @@ describe('OrderService Billing Calculations', () => {
     });
 
     expect(result.taxableBase).toBe(135.0);
-    expect(result.taxAmount).toBe(5.65);
-    expect(result.grossTotal).toBe(140.65);
-    expect(result.finalPayable).toBe(140.65);
+    expect(result.taxAmount).toBe(6.3);
+    expect(result.grossTotal).toBe(141.3);
+    expect(result.finalPayable).toBe(141.3);
   });
 
   describe('Option 2: Bundled GST Billing (Third Change Regression & Automation Tests)', () => {
@@ -538,18 +538,18 @@ describe('OrderService Billing Calculations', () => {
         insuranceType: 'MONTHLY', // ₹250
       });
 
-      // Platform GST = 5 * 0.05 = 0.25; free delivery adds no GST.
+      // Platform GST = 5 * 0.18 = 0.90; free delivery adds no GST.
       // Monthly Insurance = 250.0
-      // Gross Total = 47.0 + 0.25 + 250.0 = 297.25
+      // Gross Total = 47.0 + 0.90 + 250.0 = 297.90
       // Final Payable = 305.46
       expect(result.subtotal).toBe(42.0);
       expect(result.platformFee).toBe(5.0);
       expect(result.deliveryCharge).toBe(0.0);
       expect(result.taxableBase).toBe(47.0);
-      expect(result.taxAmount).toBe(0.25);
+      expect(result.taxAmount).toBe(0.9);
       expect(result.insuranceCharge).toBe(250.0);
-      expect(result.grossTotal).toBe(297.25);
-      expect(result.finalPayable).toBe(297.25);
+      expect(result.grossTotal).toBe(297.9);
+      expect(result.finalPayable).toBe(297.9);
     });
   });
 
@@ -714,11 +714,11 @@ describe('OrderService Billing Calculations', () => {
 
         expect(result.firstOrderDiscount).toBe(50.0);
         expect(result.deliveryCharge).toBe(0.0); // > 300 free delivery
-        // Free delivery has no delivery GST; platform GST is 0.25.
+        // Free delivery has no delivery GST; platform GST is 0.90.
         expect(result.subtotal).toBe(400.0);
-        expect(result.taxAmount).toBe(0.25);
-        expect(result.grossTotal).toBe(405.25);
-        expect(result.finalPayable).toBe(355.25); // 405.25 - 50 = 355.25
+        expect(result.taxAmount).toBe(0.9);
+        expect(result.grossTotal).toBe(405.9);
+        expect(result.finalPayable).toBe(355.9); // 405.90 - 50 = 355.90
         expect(result.totalSavings).toBe(80.0); // 30 (free delivery) + 50 (first order)
       });
 
@@ -736,11 +736,11 @@ describe('OrderService Billing Calculations', () => {
 
         expect(result.firstOrderDiscount).toBe(50.0);
         expect(result.deliveryCharge).toBe(0.0); // > 300 free delivery
-        // Free delivery has no delivery GST; platform GST is 0.25.
+        // Free delivery has no delivery GST; platform GST is 0.90.
         expect(result.subtotal).toBe(360.0);
-        expect(result.taxAmount).toBe(0.25);
-        expect(result.grossTotal).toBe(365.25);
-        expect(result.finalPayable).toBe(315.25); // 365.25 - 50 = 315.25
+        expect(result.taxAmount).toBe(0.9);
+        expect(result.grossTotal).toBe(365.9);
+        expect(result.finalPayable).toBe(315.9); // 365.90 - 50 = 315.90
         expect(result.totalSavings).toBe(80.0);
       });
 

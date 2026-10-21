@@ -137,27 +137,6 @@ export class AuthService {
       customerCode = `CUST-${String(count + 1).padStart(4, '0')}`;
     }
 
-    // Check if referralCode is valid if provided
-    let referrerId: number | null = null;
-    if (dto.referralCode && dto.referralCode.trim()) {
-      const refTrimmed = dto.referralCode.trim();
-      const altRef = refTrimmed.startsWith('+91') ? refTrimmed.slice(3) : `+91${refTrimmed}`;
-      const referrer = await this.prisma.customer.findFirst({
-        where: {
-          OR: [
-            { referralCode: refTrimmed },
-            { customerCode: refTrimmed },
-            { mobileNumber: refTrimmed },
-            { mobileNumber: altRef }
-          ]
-        }
-      });
-      if (!referrer) {
-        throw new BadRequestException('Invalid referral code');
-      }
-      referrerId = referrer.id;
-    }
-
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     const customer = await this.prisma.customer.create({
@@ -196,17 +175,6 @@ export class AuthService {
           lng: dto.lng || null,
           isDefault: true,
         },
-      });
-    }
-
-    if (referrerId) {
-      await this.prisma.referral.create({
-        data: {
-          referrerId: referrerId,
-          referredId: customer.id,
-          referrerUsed: false,
-          referredUsed: false,
-        }
       });
     }
 

@@ -396,20 +396,7 @@ export class OrderService implements OnModuleInit {
       hasDryCleaning,
     );
 
-    let referralDiscount = 0.0;
-    const pendingRefereeReferral = await this.prisma.referral.findUnique({
-      where: { referredId: customerId },
-    });
-    if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
-      referralDiscount = 50.0;
-    } else {
-      const pendingReferrerReferral = await this.prisma.referral.findFirst({
-        where: { referrerId: customerId, referrerUsed: false },
-      });
-      if (pendingReferrerReferral) {
-        referralDiscount = 50.0;
-      }
-    }
+    const referralDiscount = 0.0;
 
     let couponDiscount = 0.0;
     let appliedCouponCode: string | undefined = undefined;
@@ -426,7 +413,7 @@ export class OrderService implements OnModuleInit {
     }
 
     const grossTotal = subtotal + platformFee + taxAmount + deliveryCharge + insuranceCharge;
-    let totalDiscount = firstOrderDiscount + referralDiscount + couponDiscount;
+    let totalDiscount = firstOrderDiscount + couponDiscount;
 
     if (totalDiscount > grossTotal) {
       totalDiscount = grossTotal;
@@ -435,7 +422,7 @@ export class OrderService implements OnModuleInit {
     const netAmount = parseFloat((grossTotal - totalDiscount).toFixed(2));
     const finalPayable = netAmount;
     const roundOff = 0.0;
-    const totalSavings = freeDeliverySaving + firstOrderDiscount + referralDiscount + couponDiscount;
+    const totalSavings = freeDeliverySaving + firstOrderDiscount + couponDiscount;
 
     return {
       subtotal: parseFloat(subtotal.toFixed(2)),
@@ -597,35 +584,6 @@ export class OrderService implements OnModuleInit {
       totalPrice: item.totalPrice,
     }));
 
-    // Find pending referrals to mark as used
-    let referralToUpdateReferredId: number | null = null;
-    let referralToUpdateReferrerId: number | null = null;
-
-    const totalQuantity = (createOrderDto.orderItems || []).reduce((sum, item) => sum + item.quantity, 0);
-    const existingOrdersCount = await this.prisma.order.count({
-      where: {
-        customerId,
-        orderStatus: { notIn: ['Cancelled', 'Failed'] },
-      },
-    });
-    const isFirstOrder = existingOrdersCount === 0;
-
-    if (bill.referralDiscount > 0) {
-      const pendingRefereeReferral = await this.prisma.referral.findUnique({
-        where: { referredId: customerId },
-      });
-      if (pendingRefereeReferral && !pendingRefereeReferral.referredUsed) {
-        referralToUpdateReferredId = pendingRefereeReferral.id;
-      } else {
-        const pendingReferrerReferral = await this.prisma.referral.findFirst({
-          where: { referrerId: customerId, referrerUsed: false },
-        });
-        if (pendingReferrerReferral) {
-          referralToUpdateReferrerId = pendingReferrerReferral.id;
-        }
-      }
-    }
-
     // Generate OrderNumber safely
     const maxOrder = await this.prisma.order.findFirst({
       orderBy: { id: 'desc' },
@@ -652,33 +610,6 @@ export class OrderService implements OnModuleInit {
         await tx.customer.update({
           where: { id: customerId },
           data: { insuranceExpiry: expiryDate },
-        });
-      }
-
-      if (referralToUpdateReferredId) {
-        await tx.referral.update({
-          where: { id: referralToUpdateReferredId },
-          data: { referredUsed: true },
-        });
-      }
-
-      // If referred customer places their 1st order with >10 clothes or subtotal > 600, award ₹100 to referrer
-      if (isFirstOrder && (totalQuantity > 10 || bill.subtotal > 600.0)) {
-        const refRecord = await tx.referral.findUnique({
-          where: { referredId: customerId },
-        });
-        if (refRecord) {
-          await tx.referral.update({
-            where: { id: refRecord.id },
-            data: { referredUsed: true, referrerUsed: false },
-          });
-        }
-      }
-
-      if (referralToUpdateReferrerId) {
-        await tx.referral.update({
-          where: { id: referralToUpdateReferrerId },
-          data: { referrerUsed: true },
         });
       }
 

@@ -6,6 +6,7 @@ import { NotificationSenderService } from '../notification/notification-sender.s
 import type { IPaymentGatewayProvider } from './interfaces/payment-gateway.interface';
 import { PAYMENT_GATEWAY_PROVIDER } from './interfaces/payment-gateway.interface';
 import { ConfigService } from '@nestjs/config';
+import { getPaymentStatusForTotal, getTotalPaidIncludingCredits } from '../order/order-payment.utils';
 
 @Injectable()
 export class PaymentService {
@@ -45,15 +46,10 @@ export class PaymentService {
       const allPayments = await tx.payment.findMany({
         where: { orderId, paymentStatus: 'Completed' },
       });
-      const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = getTotalPaidIncludingCredits(order.notes, allPayments, order.netAmount);
 
       // Determine order payment status
-      let paymentStatus = 'Pending';
-      if (totalPaid >= order.netAmount) {
-        paymentStatus = 'Paid';
-      } else if (totalPaid > 0) {
-        paymentStatus = 'Partially Paid';
-      }
+      const paymentStatus = getPaymentStatusForTotal(order.netAmount, totalPaid);
 
       await tx.order.update({
         where: { id: orderId },
@@ -95,7 +91,7 @@ export class PaymentService {
     const completedPayments = await this.prisma.payment.findMany({
       where: { orderId, paymentStatus: 'Completed' },
     });
-    const totalPaid = completedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = getTotalPaidIncludingCredits(order.notes, completedPayments, order.netAmount);
     const remainingAmount = Math.max(0, order.netAmount - totalPaid);
 
     if (remainingAmount <= 0) {
@@ -169,7 +165,7 @@ export class PaymentService {
     const completedPayments = await this.prisma.payment.findMany({
       where: { orderId, paymentStatus: 'Completed' },
     });
-    const totalPaid = completedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = getTotalPaidIncludingCredits(order.notes, completedPayments, order.netAmount);
     const amountToPay = Math.max(0, order.netAmount - totalPaid);
 
     // 5. Update DB in atomic transaction
@@ -188,14 +184,9 @@ export class PaymentService {
       const updatedAllPayments = await tx.payment.findMany({
         where: { orderId, paymentStatus: 'Completed' },
       });
-      const newTotalPaid = updatedAllPayments.reduce((sum, p) => sum + p.amount, 0);
+      const newTotalPaid = getTotalPaidIncludingCredits(order.notes, updatedAllPayments, order.netAmount);
 
-      let paymentStatus = 'Pending';
-      if (newTotalPaid >= order.netAmount) {
-        paymentStatus = 'Paid';
-      } else if (newTotalPaid > 0) {
-        paymentStatus = 'Partially Paid';
-      }
+      const paymentStatus = getPaymentStatusForTotal(order.netAmount, newTotalPaid);
 
       await tx.order.update({
         where: { id: orderId },

@@ -4,6 +4,7 @@ import { OrderRepository, ServiceRepository, CustomerRepository, BranchRepositor
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationSenderService } from '../notification/notification-sender.service';
 import { BadRequestException } from '@nestjs/common';
+import { getCreditsAppliedFromNotes, getPaymentStatusForTotal, getTotalPaidIncludingCredits } from './order-payment.utils';
 
 describe('OrderService Billing Calculations', () => {
   let orderService: OrderService;
@@ -67,6 +68,22 @@ describe('OrderService Billing Calculations', () => {
     expect(OrderService.calculateFeeGst(5, 0)).toBe(0.9);
     expect(OrderService.calculateFeeGst(0, 30)).toBe(5.4);
     expect(OrderService.calculateFeeGst(0, 0)).toBe(0);
+  });
+
+  it('counts card payment plus wallet credits as fully paid without double-counting', () => {
+    const orderNotes = 'Grivana Credits Applied: Rs. 50.00 | Payment Mode: UPI (Razorpay) + Credits';
+    const cardPayment = [{ amount: 10.18, paymentMode: 'UPI (Razorpay)', paymentStatus: 'Completed' }];
+
+    expect(getCreditsAppliedFromNotes(orderNotes)).toBe(50);
+    const paidWithLegacyCredits = getTotalPaidIncludingCredits(orderNotes, cardPayment);
+    expect(paidWithLegacyCredits).toBe(60.18);
+    expect(getPaymentStatusForTotal(60.18, paidWithLegacyCredits)).toBe('Paid');
+
+    const recordedCreditPayment = [
+      ...cardPayment,
+      { amount: 50, paymentMode: 'Grivana Credits', paymentStatus: 'Completed' },
+    ];
+    expect(getTotalPaidIncludingCredits(orderNotes, recordedCreditPayment)).toBe(60.18);
   });
 
   it('should calculate bill correctly with GST, platform fee, and delivery charges', async () => {

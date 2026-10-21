@@ -3,6 +3,7 @@ import { OrderRepository, ServiceRepository, CustomerRepository, BranchRepositor
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto, CreateTimeSlotDto, UpdateTimeSlotDto } from './dto/order.dto';
 import { NotificationSenderService } from '../notification/notification-sender.service';
+import { getCreditsAppliedFromNotes, getPaymentStatusForTotal, getTotalPaidIncludingCredits } from './order-payment.utils';
 
 @Injectable()
 export class OrderService implements OnModuleInit {
@@ -626,6 +627,7 @@ export class OrderService implements OnModuleInit {
       let resolvedPaymentMode = createOrderDto.paymentMode;
       let resolvedPaidAmount = createOrderDto.paidAmount;
       let resolvedTxnRef = createOrderDto.transactionReference;
+      const creditsApplied = Math.min(getCreditsAppliedFromNotes(orderNotes, bill.finalPayable), bill.finalPayable);
 
       if (resolvedPaymentMode === 'Razorpay') {
         resolvedPaymentMode = 'UPI (Razorpay)';
@@ -635,7 +637,6 @@ export class OrderService implements OnModuleInit {
       if (!resolvedPaymentMode && orderNotes) {
         if (orderNotes.includes('Grivana Credits (100% Covered)') || orderNotes.includes('Payment Mode: Grivana Credits')) {
           resolvedPaymentMode = 'Grivana Credits';
-          resolvedPaidAmount = bill.finalPayable;
         } else if (orderNotes.includes('Payment Mode: GPay') || orderNotes.includes('Payment Mode: Google Pay')) {
           resolvedPaymentMode = 'Google Pay / UPI';
           resolvedPaidAmount = bill.finalPayable;
@@ -648,19 +649,6 @@ export class OrderService implements OnModuleInit {
         }
       }
 
-      if (resolvedPaidAmount === undefined || resolvedPaidAmount === null) {
-        if (orderNotes) {
-          const creditMatch = orderNotes.match(/Grivana Credits Applied:\s*Rs\.\s*([\d.]+)/i);
-          if (creditMatch) {
-            const parsedCredits = parseFloat(creditMatch[1]);
-            if (!isNaN(parsedCredits) && parsedCredits > 0) {
-              resolvedPaidAmount = parsedCredits;
-              if (!resolvedPaymentMode) resolvedPaymentMode = 'Grivana Credits';
-            }
-          }
-        }
-      }
-
       if (!resolvedTxnRef && orderNotes) {
         const txnMatch = orderNotes.match(/Txn Ref:\s*([^\s|]+)/i);
         if (txnMatch) {
@@ -670,12 +658,6 @@ export class OrderService implements OnModuleInit {
 
       let paymentToCreate: any = null;
       if (resolvedPaidAmount !== undefined && resolvedPaidAmount !== null && resolvedPaidAmount > 0) {
-        if (resolvedPaidAmount >= bill.finalPayable) {
-          initialPaymentStatus = 'Paid';
-        } else {
-          initialPaymentStatus = 'Partially Paid';
-        }
-
         paymentToCreate = {
           amount: resolvedPaidAmount,
           paymentMode: resolvedPaymentMode || 'Grivana Credits',
@@ -683,6 +665,10 @@ export class OrderService implements OnModuleInit {
           paymentStatus: 'Completed',
         };
       }
+      initialPaymentStatus = getPaymentStatusForTotal(
+        bill.finalPayable,
+        Math.max(0, resolvedPaidAmount || 0) + creditsApplied,
+      );
 
       // Synchronize First Order Discount note with true calculated bill.firstOrderDiscount
       if (bill.firstOrderDiscount > 0) {
@@ -742,6 +728,17 @@ export class OrderService implements OnModuleInit {
             amount: paymentToCreate.amount,
             paymentMode: paymentToCreate.paymentMode,
             transactionReference: paymentToCreate.transactionReference,
+            paymentStatus: 'Completed',
+          },
+        });
+      }
+      if (creditsApplied > 0) {
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            amount: creditsApplied,
+            paymentMode: 'Grivana Credits',
+            transactionReference: `CREDIT-${order.orderNumber}`,
             paymentStatus: 'Completed',
           },
         });
@@ -848,6 +845,9 @@ export class OrderService implements OnModuleInit {
 
     return {
       ...order,
+      paymentStatus: getTotalPaidIncludingCredits(order.notes, order.payments || [], netAmount) >= netAmount
+        ? 'Paid'
+        : order.paymentStatus,
       notes: sanitizedNotes,
       platformFee,
       taxableBase: parseFloat((subtotal + platformFee + deliveryCharge).toFixed(2)),
@@ -876,7 +876,10 @@ export class OrderService implements OnModuleInit {
       },
       orderBy: { createdDate: 'desc' },
     });
-    return orders.map(o => this.enrichOrderWithBillingDetails(o));
+    return Promise.all(orders.map(async order => {
+      const reconciledOrder = await this.reconcileLegacyCreditPaymentStatus(order);
+      return this.enrichOrderWithBillingDetails(reconciledOrder);
+    }));
   }
 
   async findOne(id: number) {
@@ -884,7 +887,17 @@ export class OrderService implements OnModuleInit {
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
-    return this.enrichOrderWithBillingDetails(order);
+    const reconciledOrder = await this.reconcileLegacyCreditPaymentStatus(order);
+    return this.enrichOrderWithBillingDetails(reconciledOrder);
+  }
+
+  private async reconcileLegacyCreditPaymentStatus(order: any) {
+    if (order.paymentStatus === 'Paid') return order;
+    const totalPaid = getTotalPaidIncludingCredits(order.notes, order.payments || [], order.netAmount);
+    if (getPaymentStatusForTotal(order.netAmount, totalPaid) !== 'Paid') return order;
+
+    await this.orderRepository.update(order.id, { paymentStatus: 'Paid' });
+    return { ...order, paymentStatus: 'Paid' };
   }
 
   async updateStatus(id: number, dto: UpdateOrderStatusDto) {

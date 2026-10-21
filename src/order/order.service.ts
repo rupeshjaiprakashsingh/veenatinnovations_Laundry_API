@@ -73,6 +73,12 @@ export class OrderService implements OnModuleInit {
     return { taxableBase, taxAmount };
   }
 
+  public static calculateFeeGst(platformFee: number, deliveryFee: number): number {
+    const platformGst = platformFee > 0 ? platformFee * 0.05 : 0;
+    const deliveryGst = deliveryFee > 0 ? deliveryFee * 0.18 : 0;
+    return parseFloat((platformGst + deliveryGst).toFixed(2));
+  }
+
   /**
    * Inclusive Pricing Model (Document Page 1, 2 & 3)
    * Formula: Taxable Value = Price ÷ (1 + GST%)
@@ -363,10 +369,8 @@ export class OrderService implements OnModuleInit {
     const deliveryCharge = isPriorityOrder ? 30.0 : standardDeliveryCharge;
     const freeDeliverySaving = isPriorityOrder ? 0.0 : (standardDeliveryCharge === 0.0 ? 30.0 : 0.0);
 
-    // Option 2: Bundled GST Billing
-    // Combines all components into one "service package" (Laundry subtotal + Platform Fee + Delivery Fee) before applying GST (default 18%)
-    const gstRatePercent = parseFloat(process.env.GST_RATE || '18');
-    const { taxableBase, taxAmount } = OrderService.calculateBundledGst(subtotal, platformFee, deliveryCharge, gstRatePercent);
+    const taxableBase = parseFloat((subtotal + platformFee + deliveryCharge).toFixed(2));
+    const taxAmount = OrderService.calculateFeeGst(platformFee, deliveryCharge);
 
     const hasActiveInsurance = customer.insuranceExpiry && new Date(customer.insuranceExpiry) > new Date();
     let insuranceCharge = 0;

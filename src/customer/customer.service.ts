@@ -118,7 +118,7 @@ export class CustomerService {
     const updated = await this.customerRepository.update(id, customerUpdateData);
 
     // Sync to default Address record as well
-    if (updateCustomerDto.address || updateCustomerDto.city || updateCustomerDto.state || updateCustomerDto.pincode || updateCustomerDto.landmark || updateCustomerDto.houseDetails || updateCustomerDto.lat || updateCustomerDto.lng) {
+    if (updateCustomerDto.address || updateCustomerDto.city || updateCustomerDto.state || updateCustomerDto.pincode || updateCustomerDto.landmark || updateCustomerDto.houseDetails || updateCustomerDto.lat != null || updateCustomerDto.lng != null) {
       const defaultAddr = await this.prisma.address.findFirst({
         where: { customerId: id, isDefault: true },
       });
@@ -148,8 +148,8 @@ export class CustomerService {
             pincode: updateCustomerDto.pincode || updated.pincode || null,
             landmark: updateCustomerDto.landmark || updated.landmark || null,
             houseDetails: updateCustomerDto.houseDetails || updated.houseDetails || null,
-            lat: updateCustomerDto.lat || null,
-            lng: updateCustomerDto.lng || null,
+            lat: updateCustomerDto.lat ?? null,
+            lng: updateCustomerDto.lng ?? null,
             isDefault: true,
           },
         });

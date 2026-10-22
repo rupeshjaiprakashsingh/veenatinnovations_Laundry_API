@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEmail, IsBoolean, IsNumber, IsInt, Min, Max, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsEmail, IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateCustomerDto {
@@ -88,17 +88,3 @@ export class UpdateCustomerDto {
   lng?: number;
 }
 
-export class CreateCustomerFeedbackDto {
-  @ApiProperty({ example: 5, required: false, minimum: 1, maximum: 5 })
-  @IsInt()
-  @Min(1)
-  @Max(5)
-  @IsOptional()
-  rating?: number;
-
-  @ApiProperty({ example: 'Pickup was on time.', required: false, maxLength: 2000 })
-  @IsString()
-  @MaxLength(2000)
-  @IsOptional()
-  message?: string;
-}

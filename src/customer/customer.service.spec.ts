@@ -21,7 +21,6 @@ describe('CustomerService – findAll() serviceability', () => {
     orderStatusHistory: { deleteMany: jest.fn() },
     order: { findMany: jest.fn(), deleteMany: jest.fn() },
     customer: { findFirst: jest.fn(), delete: jest.fn(), deleteMany: jest.fn() },
-    customerFeedback: { create: jest.fn() },
     $transaction: jest.fn(),
   });
 
@@ -64,24 +63,6 @@ describe('CustomerService – findAll() serviceability', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
-
-  it('stores feedback for the authenticated customer', async () => {
-    const created = { id: 14, rating: 5, message: 'Great pickup.', createdDate: new Date() };
-    (prisma.customerFeedback.create as jest.Mock).mockResolvedValue(created);
-
-    const result = await service.createFeedback(7, { rating: 5, message: '  Great pickup.  ' });
-
-    expect(prisma.customerFeedback.create).toHaveBeenCalledWith({
-      data: { customerId: 7, rating: 5, message: 'Great pickup.' },
-      select: { id: true, rating: true, message: true, createdDate: true },
-    });
-    expect(result).toEqual(created);
-  });
-
-  it('rejects empty feedback submissions', async () => {
-    await expect(service.createFeedback(7, { message: '   ' })).rejects.toThrow('Provide a rating or feedback message.');
-    expect(prisma.customerFeedback.create).not.toHaveBeenCalled();
-  });
 
   it('should mark customer serviceable when active laundry shop exists for pincode', async () => {
     customerRepo.findAll.mockResolvedValue([{ ...baseCustomer, pincode: '421103' }]);

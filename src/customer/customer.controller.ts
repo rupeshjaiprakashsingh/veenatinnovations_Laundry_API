@@ -1,7 +1,7 @@
-import { Controller, Get, Body, Put, Param, Delete, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CustomerService } from './customer.service';
-import { UpdateCustomerDto } from './customer.dto';
+import { CreateCustomerFeedbackDto, UpdateCustomerDto } from './customer.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -18,6 +18,13 @@ export class CustomerController {
   @ApiOperation({ summary: 'Get list of all customers (Staff only)' })
   findAll() {
     return this.customerService.findAll();
+  }
+
+  @Post('feedback')
+  @Roles('Customer')
+  @ApiOperation({ summary: 'Submit customer rating and feedback' })
+  createFeedback(@Body() feedbackDto: CreateCustomerFeedbackDto, @Req() req: any) {
+    return this.customerService.createFeedback(req.user.userId, feedbackDto);
   }
 
   @Get(':id')

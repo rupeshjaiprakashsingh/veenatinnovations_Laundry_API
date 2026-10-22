@@ -37,6 +37,7 @@ model Customer {
   referralsSent      Referral[]      @relation("ReferrerRelation")
   referralReceived   Referral?       @relation("ReferredRelation")
   addresses          Address[]
+  feedback           CustomerFeedback[]
 
   @@map("customers")
 }
@@ -198,6 +199,18 @@ model Address {
   updatedDate  DateTime @updatedAt
 
   @@map("addresses")
+}
+
+model CustomerFeedback {
+  id          Int      @id @default(autoincrement())
+  customerId  Int
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rating      Int?
+  message     String?
+  createdDate DateTime @default(now())
+
+  @@index([customerId, createdDate])
+  @@map("customer_feedback")
 }
 
 model OrderItem {

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CustomerRepository } from '../common/repositories/laundry.repositories';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { UpdateCustomerDto } from './customer.dto';
+import { CreateCustomerFeedbackDto, UpdateCustomerDto } from './customer.dto';
 
 @Injectable()
 export class CustomerService {
@@ -9,6 +9,22 @@ export class CustomerService {
     private readonly customerRepository: CustomerRepository,
     private readonly prisma: PrismaService,
   ) {}
+
+  async createFeedback(customerId: number, feedbackDto: CreateCustomerFeedbackDto) {
+    const message = feedbackDto.message?.trim() || null;
+    if (feedbackDto.rating == null && !message) {
+      throw new BadRequestException('Provide a rating or feedback message.');
+    }
+
+    return this.prisma.customerFeedback.create({
+      data: {
+        customerId,
+        rating: feedbackDto.rating ?? null,
+        message,
+      },
+      select: { id: true, rating: true, message: true, createdDate: true },
+    });
+  }
 
   async findAll() {
     const customers = await this.customerRepository.findAll();

@@ -265,15 +265,67 @@ export class ServiceService implements OnModuleInit {
   }
 
   async createServicePrice(dto: CreateServicePriceDto) {
+    const serviceId = Number(dto.serviceId);
+    const productId = Number(dto.productId);
+    const pincode = (dto.pincode || 'DEFAULT').trim().toUpperCase() || 'DEFAULT';
+    const price = Number(dto.price);
+    const isActive = dto.isActive !== undefined ? Boolean(dto.isActive) : true;
+
+    const existing = await this.prisma.servicePrice.findFirst({
+      where: {
+        serviceId,
+        productId,
+        pincode: { equals: pincode, mode: 'insensitive' },
+      },
+    });
+
+    if (existing) {
+      return this.prisma.servicePrice.update({
+        where: { id: existing.id },
+        data: {
+          price,
+          pincode,
+          isActive,
+        },
+        include: {
+          service: true,
+          product: true,
+        },
+      });
+    }
+
     return this.prisma.servicePrice.create({
-      data: dto
+      data: {
+        serviceId,
+        productId,
+        pincode,
+        price,
+        isActive,
+      },
+      include: {
+        service: true,
+        product: true,
+      },
     });
   }
 
   async updateServicePrice(id: number, dto: UpdateServicePriceDto) {
+    const data: Record<string, any> = {};
+    if (dto.serviceId !== undefined) data.serviceId = Number(dto.serviceId);
+    if (dto.productId !== undefined) data.productId = Number(dto.productId);
+    if (dto.pincode !== undefined) {
+      data.pincode = dto.pincode.trim().toUpperCase() || 'DEFAULT';
+    }
+    if (dto.price !== undefined) data.price = Number(dto.price);
+    if (dto.isActive !== undefined) data.isActive = Boolean(dto.isActive);
+
     return this.prisma.servicePrice.update({
       where: { id },
-      data: dto
+      data,
+      include: {
+        service: true,
+        product: true,
+      },
     });
   }
 
@@ -305,4 +357,3 @@ export class ServiceService implements OnModuleInit {
     return { serviceable: false };
   }
 }
-

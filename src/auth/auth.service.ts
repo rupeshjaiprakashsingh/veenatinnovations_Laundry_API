@@ -190,6 +190,28 @@ export class AuthService {
       console.error('Welcome email failed:', err);
     });
 
+    // Send admin notification alert email to Info@saimorphixinnovations.com
+    this.notificationSender.sendAdminNewCustomerAlertEmail({
+      name: `${customer.firstName} ${customer.lastName}`.trim(),
+      customerCode: customer.customerCode,
+      email: customer.email,
+      mobileNumber: customer.mobileNumber,
+      registeredAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST',
+      address: customer.address,
+      houseDetails: customer.houseDetails,
+      landmark: customer.landmark,
+      city: customer.city,
+      state: customer.state,
+      pincode: customer.pincode,
+      lat: dto.lat ?? null,
+      lng: dto.lng ?? null,
+      gender: customer.gender,
+      dob: customer.dob,
+      referralCode: customer.referralCode,
+    }).catch(err => {
+      console.error('[ADMIN NOTIFICATION ERROR] Failed to send new customer alert email:', err?.message || err);
+    });
+
     return {
       user: {
         id: customer.id,
@@ -236,6 +258,30 @@ export class AuthService {
         isActive: true,
       },
     });
+
+    // Send admin alert for new employee/user creation
+    const adminEmail = this.notificationSender.getAdminEmail();
+    this.notificationSender.sendEmail(
+      adminEmail,
+      `👔 [New Employee/User Created] ${employee.fullName} (${employee.role}) - ${employee.employeeCode}`,
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px; background-color: #EEF2FF; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #4F46E5; margin: 0; font-size: 20px;">New Staff / User Account Created</h2>
+        </div>
+        <p style="color: #334155; font-size: 15px;">A new employee user account has been registered in Grivana:</p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin: 15px 0;">
+          <tr><td style="padding: 6px 0; color: #64748b; width: 35%;">Full Name:</td><td style="font-weight: 600; color: #1e293b;">${employee.fullName}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;">Role:</td><td style="font-weight: 600; color: #4F46E5;">${employee.role}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;">Employee Code:</td><td style="font-family: monospace; font-weight: 700;">${employee.employeeCode}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;">Email:</td><td>${employee.email}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;">Mobile:</td><td>${employee.mobileNumber}</td></tr>
+        </table>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center;">&copy; Saimorphix Innovations. All rights reserved.</p>
+      </div>
+      `
+    ).catch(err => console.error('[ADMIN EMPLOYEE NOTIFICATION ERROR]', err));
 
     return {
       id: employee.id,

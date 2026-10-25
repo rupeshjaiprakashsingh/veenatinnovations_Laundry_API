@@ -56,7 +56,7 @@ describe('OrderService Billing Calculations', () => {
         { provide: CustomerRepository, useValue: customerRepositoryMock },
         { provide: BranchRepository, useValue: {} },
         { provide: PrismaService, useValue: prismaMock },
-        { provide: NotificationSenderService, useValue: { sendOrderCreatedEmail: jest.fn(), sendPaymentReceivedEmail: jest.fn().mockResolvedValue(true) } },
+        { provide: NotificationSenderService, useValue: { sendOrderCreatedEmail: jest.fn(), sendPaymentReceivedEmail: jest.fn().mockResolvedValue(true), sendAdminNewOrderAlertEmail: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
 

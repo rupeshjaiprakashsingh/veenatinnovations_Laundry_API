@@ -1,6 +1,66 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+export interface AdminNewCustomerAlertDto {
+  name: string;
+  customerCode: string;
+  email: string;
+  mobileNumber: string;
+  registeredAt?: string;
+  address?: string | null;
+  houseDetails?: string | null;
+  landmark?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  gender?: string | null;
+  dob?: string | null;
+  referralCode?: string | null;
+}
+
+export interface AdminNewOrderAlertDto {
+  orderNumber: string;
+  orderId?: number;
+  createdAt?: string;
+  isFirstOrder: boolean;
+  isPriorityOrder?: boolean;
+  customerName: string;
+  customerCode?: string;
+  customerMobile?: string;
+  customerEmail?: string;
+  pickupDate?: string | null;
+  deliveryDate?: string | null;
+  timeSlot?: string | null;
+  notes?: string | null;
+  addressTitle?: string | null;
+  address?: string | null;
+  houseDetails?: string | null;
+  landmark?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  orderItems: Array<{
+    clothType?: string;
+    serviceName?: string;
+    serviceType?: string;
+    quantity: number;
+    unitPrice?: number;
+    totalPrice?: number;
+  }>;
+  subtotal: number;
+  platformFee?: number;
+  deliveryCharge?: number;
+  taxAmount?: number;
+  totalDiscount?: number;
+  couponCode?: string | null;
+  netAmount: number;
+  paymentStatus?: string;
+  paymentMode?: string;
+  branchName?: string | null;
+}
+
 @Injectable()
 export class NotificationSenderService {
   private transporter: nodemailer.Transporter | null = null;
@@ -509,5 +569,359 @@ export class NotificationSenderService {
       </div>
     `;
     await this.sendEmail(to, `Order #${orderNumber} - Status: ${status}`, html);
+  }
+
+  /**
+   * Resolve Admin Notification Email address.
+   * Priority: ADMIN_NOTIFICATION_EMAIL env var -> Fallback: Info@saimorphixinnovations.com
+   */
+  getAdminEmail(): string {
+    return (process.env.ADMIN_NOTIFICATION_EMAIL || 'Info@saimorphixinnovations.com').trim();
+  }
+
+  /**
+   * Send Admin Notification Email when a new user/customer registers on the app.
+   * Target: Info@saimorphixinnovations.com (or ADMIN_NOTIFICATION_EMAIL)
+   */
+  async sendAdminNewCustomerAlertEmail(data: AdminNewCustomerAlertDto) {
+    const adminEmail = this.getAdminEmail();
+    const registeredAt = data.registeredAt || (new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST');
+
+    const addressParts = [
+      data.houseDetails,
+      data.address,
+      data.landmark ? `Near ${data.landmark}` : '',
+      data.city,
+      data.state,
+      data.pincode ? `PIN: ${data.pincode}` : '',
+    ].filter(Boolean);
+    const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided yet';
+
+    const coordinates = (data.lat && data.lng) ? `${data.lat}, ${data.lng}` : 'Not captured';
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 24px; background: linear-gradient(135deg, #4F46E5 0%, #3730A3 100%); padding: 24px 20px; border-radius: 10px; color: #ffffff;">
+          <span style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;">
+            🎉 New App User Registration
+          </span>
+          <h2 style="margin: 6px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff;">New Customer Alert</h2>
+          <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9; color: #E0E7FF;">Grivana Laundry Operations</p>
+        </div>
+
+        <p style="font-size: 15px; line-height: 1.6; color: #334155;">
+          A new customer has registered on the <strong>Grivana</strong> laundry platform. Below are the full registration details for your operational records:
+        </p>
+
+        <!-- Customer Summary Card -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+          <h3 style="margin: 0 0 14px 0; font-size: 15px; color: #1E293B; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px;">
+            👤 Customer Information
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; width: 35%; font-weight: 500;">Customer Name:</td>
+              <td style="padding: 7px 0; color: #0F172A; font-weight: 700; font-size: 15px;">${data.name || 'New Customer'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Customer Code:</td>
+              <td style="padding: 7px 0;">
+                <span style="font-family: monospace; background: #EEF2FF; color: #4338CA; padding: 2px 8px; border-radius: 4px; font-weight: 700;">
+                  ${data.customerCode || 'N/A'}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Mobile Number:</td>
+              <td style="padding: 7px 0; color: #0F172A; font-weight: 600;">
+                <a href="tel:${data.mobileNumber}" style="color: #4F46E5; text-decoration: none;">${data.mobileNumber || 'N/A'}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Email Address:</td>
+              <td style="padding: 7px 0; color: #0F172A;">
+                <a href="mailto:${data.email}" style="color: #4F46E5; text-decoration: none;">${data.email || 'N/A'}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Registered At:</td>
+              <td style="padding: 7px 0; color: #0F172A; font-weight: 500;">${registeredAt}</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Gender / DOB:</td>
+              <td style="padding: 7px 0; color: #0F172A;">${data.gender || 'Not specified'} / ${data.dob || 'Not specified'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px 0; color: #64748B; font-weight: 500;">Referral Code:</td>
+              <td style="padding: 7px 0; color: #0F172A;">${data.referralCode || 'None'}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Address Card -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+          <h3 style="margin: 0 0 14px 0; font-size: 15px; color: #1E293B; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px;">
+            📍 Registered Service Address
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; width: 35%; font-weight: 500;">House/Flat/Room:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 600;">${data.houseDetails || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Street Address:</td>
+              <td style="padding: 6px 0; color: #0F172A;">${data.address || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Landmark:</td>
+              <td style="padding: 6px 0; color: #0F172A;">${data.landmark || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">City &amp; State:</td>
+              <td style="padding: 6px 0; color: #0F172A;">${data.city || 'N/A'}${data.state ? ', ' + data.state : ''}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">PIN Code:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 700;">${data.pincode || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">GPS Coordinates:</td>
+              <td style="padding: 6px 0; color: #64748B; font-family: monospace; font-size: 13px;">${coordinates}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Action Items Box -->
+        <div style="background-color: #ECFDF5; border-left: 4px solid #10B981; border-radius: 6px; padding: 14px 18px; margin: 20px 0;">
+          <p style="margin: 0 0 6px 0; color: #065F46; font-weight: 700; font-size: 14px;">⚡ Recommended Admin Actions:</p>
+          <ul style="margin: 0; padding-left: 20px; color: #047857; font-size: 13px; line-height: 1.6;">
+            <li>Verify delivery serviceability for PIN Code: <strong>${data.pincode || 'Customer Area'}</strong>.</li>
+            <li>Assign to the closest Grivana Laundry Hub or processing branch.</li>
+            <li>Customer is now eligible to place their first order with first-order savings.</li>
+          </ul>
+        </div>
+
+        <!-- Footer -->
+        <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 24px 0;" />
+        <p style="font-size: 12px; color: #94A3B8; text-align: center; margin: 0; line-height: 1.5;">
+          This is an automated operational alert sent to <strong>${adminEmail}</strong>.<br />
+          &copy; Saimorphix Innovations. All rights reserved.
+        </p>
+      </div>
+    `;
+
+    const subject = `🎉 [New Customer Alert] ${data.name || 'New Customer'} (${data.customerCode || 'Registered'}) - Grivana Laundry`;
+    return this.sendEmail(adminEmail, subject, html);
+  }
+
+  /**
+   * Send Admin Notification Email when a new laundry order is placed (for both new & existing customers).
+   * Target: Info@saimorphixinnovations.com (or ADMIN_NOTIFICATION_EMAIL)
+   */
+  async sendAdminNewOrderAlertEmail(data: AdminNewOrderAlertDto) {
+    const adminEmail = this.getAdminEmail();
+    const orderTime = data.createdAt || (new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST');
+
+    const isFirstOrder = Boolean(data.isFirstOrder);
+    const customerBadgeText = isFirstOrder ? '🌟 FIRST-TIME CUSTOMER (NEW)' : '🔄 RETURNING CUSTOMER';
+    const customerBadgeBg = isFirstOrder ? '#10B981' : '#3B82F6';
+
+    const addressParts = [
+      data.houseDetails,
+      data.address,
+      data.landmark ? `Landmark: ${data.landmark}` : '',
+      data.city,
+      data.state,
+      data.pincode ? `PIN: ${data.pincode}` : '',
+    ].filter(Boolean);
+    const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided';
+
+    const itemsList = Array.isArray(data.orderItems) ? data.orderItems : [];
+    const itemsHtml = itemsList.length > 0 ? itemsList.map((item, index) => `
+      <tr style="background-color: ${index % 2 === 0 ? '#FFFFFF' : '#F8FAFC'};">
+        <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #1E293B; font-weight: 500;">${item.clothType || 'Item'}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #475569;">${item.serviceName || item.serviceType || 'Standard'}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center; color: #1E293B; font-weight: 600;">${item.quantity || 1}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; color: #475569;">₹${typeof item.unitPrice === 'number' ? item.unitPrice.toFixed(2) : '-'}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; color: #1E293B; font-weight: 700;">₹${typeof item.totalPrice === 'number' ? item.totalPrice.toFixed(2) : '-'}</td>
+      </tr>
+    `).join('') : `
+      <tr>
+        <td colspan="5" style="padding: 14px; text-align: center; color: #64748B;">Standard Laundry Order</td>
+      </tr>
+    `;
+
+    const priorityBanner = data.isPriorityOrder ? `
+      <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; text-align: center;">
+        <span style="color: #B45309; font-weight: 700; font-size: 13px; letter-spacing: 0.5px;">
+          ⚡ PRIORITY EXPRESS ORDER - 12 TO 24 HOURS TURNAROUND REQUIRED
+        </span>
+      </div>
+    ` : '';
+
+    const deliveryDisplay = (data.deliveryCharge === 0 || data.deliveryCharge === undefined)
+      ? '<span style="color: #10B981; font-weight: 700;">FREE (₹0.00)</span>'
+      : `₹${Number(data.deliveryCharge).toFixed(2)}`;
+
+    const discountDisplay = (data.totalDiscount && data.totalDiscount > 0)
+      ? `<span style="color: #DC2626; font-weight: 700;">-₹${Number(data.totalDiscount).toFixed(2)}</span> ${data.couponCode ? `(${data.couponCode})` : ''}`
+      : '₹0.00';
+
+    const paymentStatusColor = (data.paymentStatus === 'Completed' || data.paymentStatus === 'Paid') ? '#10B981' : '#D97706';
+
+    const html = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 680px; margin: auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+        <!-- Header Banner -->
+        <div style="text-align: center; margin-bottom: 20px; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); padding: 24px 20px; border-radius: 10px; color: #ffffff;">
+          <div style="margin-bottom: 10px;">
+            <span style="background-color: ${customerBadgeBg}; color: #ffffff; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+              ${customerBadgeText}
+            </span>
+          </div>
+          <h2 style="margin: 6px 0 4px 0; font-size: 24px; font-weight: 700; color: #ffffff;">New Order Alert: #${data.orderNumber}</h2>
+          <p style="margin: 0; font-size: 14px; color: #94A3B8;">Placed on ${orderTime}</p>
+        </div>
+
+        ${priorityBanner}
+
+        <!-- Customer & Schedule Summary Card -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #1E293B; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px;">
+            📋 Order &amp; Customer Overview
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; width: 35%; font-weight: 500;">Customer:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 700;">
+                ${data.customerName || 'Customer'} 
+                ${data.customerCode ? `<span style="font-family: monospace; font-size: 12px; color: #4338CA; background: #EEF2FF; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">${data.customerCode}</span>` : ''}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Phone Number:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 600;">
+                <a href="tel:${data.customerMobile}" style="color: #4F46E5; text-decoration: none;">${data.customerMobile || 'N/A'}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Email Address:</td>
+              <td style="padding: 6px 0; color: #0F172A;">
+                <a href="mailto:${data.customerEmail}" style="color: #4F46E5; text-decoration: none;">${data.customerEmail || 'N/A'}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Pickup Schedule:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 700;">
+                ${data.pickupDate || 'Scheduled Date'} &bull; <span style="color: #4F46E5;">${data.timeSlot || 'Standard Slot'}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Target Delivery:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-weight: 600;">${data.deliveryDate || 'As per service SLA'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Pickup Address:</td>
+              <td style="padding: 6px 0; color: #0F172A; line-height: 1.4;">${fullAddress}</td>
+            </tr>
+            ${data.branchName ? `
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Assigned Branch:</td>
+              <td style="padding: 6px 0; color: #0F172A;">${data.branchName}</td>
+            </tr>
+            ` : ''}
+            ${data.notes ? `
+            <tr>
+              <td style="padding: 6px 0; color: #64748B; font-weight: 500;">Customer Notes:</td>
+              <td style="padding: 6px 0; color: #0F172A; font-style: italic;">${data.notes}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <!-- Order Items Table -->
+        <div style="background-color: #ffffff; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+          <div style="background-color: #F1F5F9; padding: 12px 16px; border-bottom: 1px solid #E2E8F0;">
+            <h3 style="margin: 0; font-size: 15px; color: #1E293B;">🧺 Garment Breakdown (${itemsList.length} items)</h3>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #F8FAFC; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">
+                <th style="padding: 10px 12px; text-align: left; color: #475569; border-bottom: 1px solid #E2E8F0;">Cloth Item</th>
+                <th style="padding: 10px 12px; text-align: left; color: #475569; border-bottom: 1px solid #E2E8F0;">Service</th>
+                <th style="padding: 10px 12px; text-align: center; color: #475569; border-bottom: 1px solid #E2E8F0;">Qty</th>
+                <th style="padding: 10px 12px; text-align: right; color: #475569; border-bottom: 1px solid #E2E8F0;">Rate</th>
+                <th style="padding: 10px 12px; text-align: right; color: #475569; border-bottom: 1px solid #E2E8F0;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Financial Summary Card -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #1E293B; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px;">
+            💰 Bill Breakdown &amp; Payment
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 5px 0; color: #64748B;">Items Subtotal:</td>
+              <td style="padding: 5px 0; text-align: right; color: #0F172A; font-weight: 500;">₹${Number(data.subtotal || 0).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #64748B;">Platform Fee:</td>
+              <td style="padding: 5px 0; text-align: right; color: #0F172A;">₹${Number(data.platformFee || 5).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #64748B;">Delivery Fee:</td>
+              <td style="padding: 5px 0; text-align: right;">${deliveryDisplay}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #64748B;">GST / Tax:</td>
+              <td style="padding: 5px 0; text-align: right; color: #0F172A;">₹${Number(data.taxAmount || 0).toFixed(2)}</td>
+            </tr>
+            ${data.totalDiscount && data.totalDiscount > 0 ? `
+            <tr>
+              <td style="padding: 5px 0; color: #64748B;">Discounts Applied:</td>
+              <td style="padding: 5px 0; text-align: right;">${discountDisplay}</td>
+            </tr>
+            ` : ''}
+            <tr style="border-top: 2px solid #E2E8F0; border-bottom: 2px solid #E2E8F0;">
+              <td style="padding: 10px 0; color: #0F172A; font-weight: 700; font-size: 16px;">Net Payable:</td>
+              <td style="padding: 10px 0; text-align: right; color: #4F46E5; font-weight: 800; font-size: 18px;">₹${Number(data.netAmount || 0).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0 0 0; color: #64748B; font-weight: 500;">Payment Status &amp; Mode:</td>
+              <td style="padding: 8px 0 0 0; text-align: right;">
+                <span style="color: ${paymentStatusColor}; font-weight: 700;">${data.paymentStatus || 'Pending'}</span> 
+                <span style="color: #64748B;">(${data.paymentMode || 'COD / Pay on Pickup'})</span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Action Items Box for Admin -->
+        <div style="background-color: #EEF2FF; border-left: 4px solid #4F46E5; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px;">
+          <p style="margin: 0 0 6px 0; color: #3730A3; font-weight: 700; font-size: 14px;">⚡ Immediate Admin Actions Required:</p>
+          <ol style="margin: 0; padding-left: 20px; color: #4338CA; font-size: 13px; line-height: 1.6;">
+            <li><strong>Assign Pickup Agent</strong> in Grivana Admin Portal for slot: <strong>${data.timeSlot || 'Scheduled Slot'}</strong> on <strong>${data.pickupDate || 'Scheduled Date'}</strong>.</li>
+            <li>Ensure driver reaches customer location: <strong>${fullAddress}</strong>.</li>
+            <li>Tag garments with order number <strong>#${data.orderNumber}</strong> upon pickup confirmation.</li>
+          </ol>
+        </div>
+
+        <!-- Footer -->
+        <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 24px 0;" />
+        <p style="font-size: 12px; color: #94A3B8; text-align: center; margin: 0; line-height: 1.5;">
+          This is an automated operational alert sent to <strong>${adminEmail}</strong>.<br />
+          &copy; Saimorphix Innovations. All rights reserved.
+        </p>
+      </div>
+    `;
+
+    const subject = `🧺 [New Order Alert] #${data.orderNumber} (₹${data.netAmount}) - ${data.customerName} [${isFirstOrder ? 'First-Time Customer' : 'Existing Customer'}]`;
+    return this.sendEmail(adminEmail, subject, html);
   }
 }

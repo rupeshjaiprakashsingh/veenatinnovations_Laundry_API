@@ -443,7 +443,8 @@ export class OrderService implements OnModuleInit {
       finalPayable,
       totalSavings: parseFloat(totalSavings.toFixed(2)),
       resolvedItems,
-      isPriorityOrder,
+      isFirstOrder,
+      isPriorityOrder: Boolean(isPriorityOrder),
     };
   }
 
@@ -776,6 +777,64 @@ export class OrderService implements OnModuleInit {
     } else {
       console.warn(`[ORDER EMAIL SKIPPED] Customer has no valid email. Order: ${resultOrder.orderNumber} | customerId: ${resultOrder.customerId}`);
     }
+
+    // Send admin new order alert email (for both new and existing customers) to Info@saimorphixinnovations.com
+    let timeSlot = '';
+    const notesSource = resultOrder.notes || notes || '';
+    if (notesSource.includes('Slot:')) {
+      const slotPart = notesSource.split('|').find(p => p.includes('Slot:'));
+      if (slotPart) {
+        timeSlot = slotPart.replace('Slot:', '').trim();
+      }
+    }
+
+    const resolvedCustName = `${resultOrder.customer?.firstName || customer?.firstName || ''} ${resultOrder.customer?.lastName || customer?.lastName || ''}`.trim() || customerName;
+    const resolvedCustMobile = resultOrder.customer?.mobileNumber || customer?.mobileNumber || 'N/A';
+    const resolvedCustCode = resultOrder.customer?.customerCode || customer?.customerCode || 'N/A';
+    const resolvedCustEmail = targetEmail || 'N/A';
+
+    this.notificationSender.sendAdminNewOrderAlertEmail({
+      orderNumber: resultOrder.orderNumber,
+      orderId: resultOrder.id,
+      createdAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST',
+      isFirstOrder: Boolean(bill.isFirstOrder),
+      isPriorityOrder: Boolean(bill.isPriorityOrder),
+      customerName: resolvedCustName,
+      customerCode: resolvedCustCode,
+      customerMobile: resolvedCustMobile,
+      customerEmail: resolvedCustEmail,
+      pickupDate: resultOrder.pickupDate ? new Date(resultOrder.pickupDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'As scheduled',
+      deliveryDate: resultOrder.deliveryDate ? new Date(resultOrder.deliveryDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'As scheduled',
+      timeSlot: timeSlot || 'Standard Slot',
+      notes: resultOrder.notes,
+      addressTitle: resultOrder.addressTitle,
+      address: resultOrder.address,
+      houseDetails: resultOrder.houseDetails,
+      landmark: resultOrder.landmark,
+      city: resultOrder.city,
+      state: resultOrder.state,
+      pincode: resultOrder.pincode,
+      orderItems: (resultOrder.orderItems || []).map(i => ({
+        clothType: i.clothType,
+        serviceName: i.service?.serviceName || 'Service',
+        serviceType: i.service?.serviceType,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        totalPrice: i.totalPrice,
+      })),
+      subtotal: bill.subtotal,
+      platformFee: bill.platformFee,
+      deliveryCharge: bill.deliveryCharge,
+      taxAmount: bill.taxAmount,
+      totalDiscount: bill.totalDiscount,
+      couponCode: bill.couponCode,
+      netAmount: resultOrder.netAmount,
+      paymentStatus: resultOrder.paymentStatus,
+      paymentMode: createOrderDto.paymentMode || 'COD / Pay on Pickup',
+      branchName: resultOrder.branch?.branchName || branch.branchName,
+    }).catch(err => {
+      console.error(`[ADMIN ORDER ALERT FAILED] Order ${resultOrder.orderNumber}:`, err?.message || err);
+    });
 
     return resultOrder;
   }

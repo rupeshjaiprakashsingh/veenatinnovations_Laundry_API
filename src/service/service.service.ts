@@ -45,14 +45,6 @@ export class ServiceService implements OnModuleInit {
           estimatedHours: 12,
           isActive: true,
         },
-        {
-          serviceName: 'Standard Washing',
-          serviceType: 'Washing',
-          price: 40.0,
-          description: 'Hygienic wash and fold for everyday laundry.',
-          estimatedHours: 24,
-          isActive: true,
-        },
       ];
 
       for (const s of defaultServices) {
@@ -67,10 +59,19 @@ export class ServiceService implements OnModuleInit {
         if (!existing) {
           await this.prisma.service.create({ data: s });
           console.log(`[ServiceService] Seeded default service: ${s.serviceName}`);
-        } else if (!existing.isActive) {
-          await this.prisma.service.update({ where: { id: existing.id }, data: { isActive: true } });
         }
       }
+
+      // Ensure Standard Washing is deactivated if present, respecting admin panel configuration
+      await this.prisma.service.updateMany({
+        where: {
+          OR: [
+            { serviceName: { contains: 'Standard Washing', mode: 'insensitive' } },
+            { serviceType: { contains: 'Washing', mode: 'insensitive' } },
+          ],
+        },
+        data: { isActive: false },
+      });
 
       // 2. Seed Standard Products if none exist
       const defaultProducts = [

@@ -52,7 +52,7 @@ export class PickupService {
         if (orderId) {
           activeOrder = await this.prisma.order.findUnique({
             where: { id: orderId },
-            include: { laundryShop: true },
+            include: { laundryShop: true, orderItems: { include: { service: true } } },
           });
         }
 
@@ -62,7 +62,7 @@ export class PickupService {
               customerId: pickup.customerId,
               orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Picked Up', 'Laundry', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery', 'Out For Delivery', 'Delivered'] },
             },
-            include: { laundryShop: true },
+            include: { laundryShop: true, orderItems: { include: { service: true } } },
             orderBy: { id: 'desc' },
           });
         }
@@ -70,7 +70,7 @@ export class PickupService {
         if (!activeOrder) {
           activeOrder = await this.prisma.order.findFirst({
             where: { customerId: pickup.customerId },
-            include: { laundryShop: true },
+            include: { laundryShop: true, orderItems: { include: { service: true } } },
             orderBy: { id: 'desc' },
           });
         }
@@ -101,8 +101,18 @@ export class PickupService {
             ? {
                 id: activeOrder.id,
                 orderNumber: activeOrder.orderNumber || generatedOrderNumber,
+                orderStatus: activeOrder.laundryShopId && ['New Order', 'Pickup Scheduled', 'Picked Up'].includes(activeOrder.orderStatus)
+                  ? 'Laundry'
+                  : activeOrder.orderStatus,
+                orderItems: activeOrder.orderItems || [],
+                totalClothes: (activeOrder.orderItems || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+                totalAmount: activeOrder.totalAmount,
+                discountAmount: activeOrder.discountAmount,
+                taxAmount: activeOrder.taxAmount,
+                notes: activeOrder.notes,
                 netAmount: activeOrder.netAmount,
                 paymentStatus: activeOrder.paymentStatus,
+                laundryShopId: activeOrder.laundryShopId,
                 laundryShop: activeOrder.laundryShop,
                 addressTitle: activeOrder.addressTitle,
                 address: activeOrder.address,
@@ -115,8 +125,16 @@ export class PickupService {
             : {
                 id: pickup.id,
                 orderNumber: generatedOrderNumber,
+                orderStatus: 'New Order',
+                orderItems: [],
+                totalClothes: 0,
+                totalAmount: 0,
+                discountAmount: 0,
+                taxAmount: 0,
+                notes: null,
                 netAmount: 0,
                 paymentStatus: 'Pending',
+                laundryShopId: null,
                 laundryShop: null,
                 addressTitle: null,
                 address: null,
@@ -185,15 +203,16 @@ export class PickupService {
         }
 
         if (activeOrder) {
-          // If a laundry shop was selected/provided, the order advances directly to 'Laundry'
-          const nextOrderStatus = dto.laundryShopId ? 'Laundry' : 'Picked Up';
+          // If a laundry shop was selected/provided (or already assigned on the order), the order advances to 'Laundry'
+          const resolvedShopId = dto.laundryShopId || activeOrder.laundryShopId;
+          const nextOrderStatus = resolvedShopId ? 'Laundry' : 'Picked Up';
 
           // Update order status
           const updatedOrder = await tx.order.update({
             where: { id: activeOrder.id },
             data: {
               orderStatus: nextOrderStatus,
-              laundryShopId: dto.laundryShopId || undefined,
+              laundryShopId: resolvedShopId || undefined,
             },
             include: { customer: true, laundryShop: true },
           });
@@ -206,12 +225,12 @@ export class PickupService {
             },
           });
 
-          // If assigned to laundry shop, also record Assigned to Laundry in history
-          if (dto.laundryShopId) {
+          // If assigned to laundry shop, also record Laundry in history
+          if (resolvedShopId) {
             await tx.orderStatusHistory.create({
               data: {
                 orderId: activeOrder.id,
-                status: 'Assigned to Laundry',
+                status: 'Laundry',
               },
             });
           }
@@ -329,7 +348,7 @@ export class PickupService {
         if (orderId) {
           activeOrder = await this.prisma.order.findUnique({
             where: { id: orderId },
-            include: { laundryShop: true },
+            include: { laundryShop: true, orderItems: { include: { service: true } } },
           });
         }
 
@@ -341,7 +360,7 @@ export class PickupService {
                 customerId: pickup.customerId,
                 orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
               },
-              include: { laundryShop: true },
+              include: { laundryShop: true, orderItems: { include: { service: true } } },
               orderBy: { id: 'desc' },
             });
 
@@ -351,7 +370,7 @@ export class PickupService {
                   customerId: pickup.customerId,
                   orderStatus: { in: ['Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
                 },
-                include: { laundryShop: true },
+                include: { laundryShop: true, orderItems: { include: { service: true } } },
                 orderBy: { id: 'desc' },
               });
             }
@@ -362,7 +381,7 @@ export class PickupService {
                 customerId: pickup.customerId,
                 orderStatus: { notIn: ['New Order', 'Pickup Scheduled'] },
               },
-              include: { laundryShop: true },
+              include: { laundryShop: true, orderItems: { include: { service: true } } },
               orderBy: { id: 'desc' },
             });
           }
@@ -394,8 +413,18 @@ export class PickupService {
             ? {
                 id: activeOrder.id,
                 orderNumber: activeOrder.orderNumber || generatedOrderNumber,
+                orderStatus: activeOrder.laundryShopId && ['New Order', 'Pickup Scheduled', 'Picked Up'].includes(activeOrder.orderStatus)
+                  ? 'Laundry'
+                  : activeOrder.orderStatus,
+                orderItems: activeOrder.orderItems || [],
+                totalClothes: (activeOrder.orderItems || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+                totalAmount: activeOrder.totalAmount,
+                discountAmount: activeOrder.discountAmount,
+                taxAmount: activeOrder.taxAmount,
+                notes: activeOrder.notes,
                 netAmount: activeOrder.netAmount,
                 paymentStatus: activeOrder.paymentStatus,
+                laundryShopId: activeOrder.laundryShopId,
                 laundryShop: activeOrder.laundryShop,
                 addressTitle: activeOrder.addressTitle,
                 address: activeOrder.address,
@@ -408,8 +437,16 @@ export class PickupService {
             : {
                 id: pickup.id,
                 orderNumber: generatedOrderNumber,
+                orderStatus: 'New Order',
+                orderItems: [],
+                totalClothes: 0,
+                totalAmount: 0,
+                discountAmount: 0,
+                taxAmount: 0,
+                notes: null,
                 netAmount: 0,
                 paymentStatus: 'Pending',
+                laundryShopId: null,
                 laundryShop: null,
                 addressTitle: null,
                 address: null,

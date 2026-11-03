@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, ParseIntPipe, Body, UseGuards, Req, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
 import { CreateNotificationDto } from './notification.dto';
@@ -217,18 +217,38 @@ export class NotificationController {
   }
 
   @Post()
-  @Roles('SuperAdmin', 'BranchManager', 'Employee')
-  @ApiOperation({ summary: 'Send/log a notification to a customer (Staff only)' })
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Send/log a notification or order message to a customer (Staff only)' })
   @ApiResponse({ status: 201, description: 'Notification logged successfully' })
   create(@Body() dto: CreateNotificationDto) {
     return this.notificationService.create(dto);
   }
 
+  @Post('send-message')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Send a real-time order-based message from Admin to Customer' })
+  sendOrderMessage(@Body() dto: CreateNotificationDto) {
+    return this.notificationService.create({
+      ...dto,
+      notificationType: dto.notificationType || 'AdminMessage',
+    });
+  }
+
   @Get()
-  @Roles('SuperAdmin', 'BranchManager', 'Employee')
-  @ApiOperation({ summary: 'Get all notifications (Staff only)' })
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Get all notifications with read status (Staff only)' })
   findAll() {
     return this.notificationService.findAll();
+  }
+
+  @Get('order/:orderId')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy', 'Customer')
+  @ApiOperation({ summary: 'Get all messages/notifications for a specific order' })
+  findByOrder(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Query('orderNumber') orderNumber?: string,
+  ) {
+    return this.notificationService.findByOrder(orderId, orderNumber);
   }
 
   @Get('my-notifications')
@@ -236,5 +256,40 @@ export class NotificationController {
   @ApiOperation({ summary: 'Get notifications for logged in customer' })
   findMyNotifications(@Req() req: any) {
     return this.notificationService.findByCustomer(req.user.userId);
+  }
+
+  @Put('mark-all-read')
+  @Roles('Customer')
+  @ApiOperation({ summary: 'Mark all notifications as read for logged in customer' })
+  markAllReadPut(@Req() req: any) {
+    return this.notificationService.markAllAsRead(req.user.userId);
+  }
+
+  @Post('mark-all-read')
+  @Roles('Customer')
+  @ApiOperation({ summary: 'Mark all notifications as read for logged in customer (POST)' })
+  markAllReadPost(@Req() req: any) {
+    return this.notificationService.markAllAsRead(req.user.userId);
+  }
+
+  @Put(':id/read')
+  @Roles('Customer', 'SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Mark a notification as read' })
+  markAsReadPut(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.notificationService.markAsRead(id, req.user?.userId, req.user?.role);
+  }
+
+  @Patch(':id/read')
+  @Roles('Customer', 'SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Mark a notification as read (PATCH)' })
+  markAsReadPatch(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.notificationService.markAsRead(id, req.user?.userId, req.user?.role);
+  }
+
+  @Post(':id/read')
+  @Roles('Customer', 'SuperAdmin', 'BranchManager', 'Employee')
+  @ApiOperation({ summary: 'Mark a notification as read (POST)' })
+  markAsReadPost(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.notificationService.markAsRead(id, req.user?.userId, req.user?.role);
   }
 }

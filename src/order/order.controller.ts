@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Put, Param, Delete, Query, UseGuards, ParseIntPipe, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
-import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto, CreateTimeSlotDto, UpdateTimeSlotDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdatePaymentStatusDto, AssignShopDto, BulkAssignShopDto, CreateTimeSlotDto, UpdateTimeSlotDto, VerifyOrderItemsDto } from './dto/order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -79,6 +79,13 @@ export class OrderController {
   @ApiOperation({ summary: 'Update order payment status (Staff only)' })
   updatePaymentStatus(@Param('id', ParseIntPipe) id: number, @Body() updatePaymentStatusDto: UpdatePaymentStatusDto) {
     return this.orderService.updatePaymentStatus(id, updatePaymentStatusDto);
+  }
+
+  @Put(':id/verify-items')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
+  @ApiOperation({ summary: 'Verify, edit, and approve clothes/items on an order (DeliveryBoy / Staff)' })
+  verifyOrderItems(@Param('id', ParseIntPipe) id: number, @Body() verifyDto: VerifyOrderItemsDto) {
+    return this.orderService.verifyAndUpdateOrderItems(id, verifyDto);
   }
 
   @Put(':id/assign-shop')

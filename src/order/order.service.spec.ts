@@ -883,3 +883,237 @@ describe('OrderService Billing Calculations', () => {
   });
 });
 
+
+describe('OrderService - Task 1 (Clothes Verification & Modification) & Task 2 (Auto Laundry Status)', () => {
+  let orderService: OrderService;
+  let orderRepoMock: any;
+  let serviceRepoMock: any;
+  let prismaMock: any;
+  let notificationSenderMock: any;
+
+  beforeEach(async () => {
+    orderRepoMock = {
+      findDetailed: jest.fn(),
+      findAll: jest.fn(),
+      update: jest.fn().mockImplementation((id, data) => Promise.resolve({ id, ...data })),
+    };
+
+    serviceRepoMock = {
+      findById: jest.fn(),
+    };
+
+    prismaMock = {
+      order: {
+        count: jest.fn().mockResolvedValue(1), // Not first order
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        findMany: jest.fn(),
+      },
+      orderItem: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+      notification: {
+        create: jest.fn().mockResolvedValue({}),
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+      pickupRequest: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      laundryShop: {
+        findUnique: jest.fn(),
+      },
+      customer: {
+        findUnique: jest.fn().mockResolvedValue({ id: 1, pincode: '400078' }),
+      },
+      product: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      servicePrice: {
+        findFirst: jest.fn(),
+      },
+      service: {
+        findUnique: jest.fn(),
+      },
+      coupon: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(prismaMock)),
+    };
+
+    notificationSenderMock = {
+      sendOrderStatusUpdateEmail: jest.fn().mockResolvedValue(true),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: OrderRepository, useValue: orderRepoMock },
+        { provide: ServiceRepository, useValue: serviceRepoMock },
+        { provide: CustomerRepository, useValue: { findById: jest.fn() } },
+        { provide: BranchRepository, useValue: { findById: jest.fn() } },
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationSenderService, useValue: notificationSenderMock },
+      ],
+    }).compile();
+
+    orderService = module.get<OrderService>(OrderService);
+  });
+
+  it('Task 2: assignToShop should automatically change orderStatus to Laundry regardless of previous status', async () => {
+    orderRepoMock.findDetailed.mockResolvedValue({
+      id: 560,
+      orderNumber: 'ORD-00560',
+      customerId: 10,
+      orderStatus: 'Pickup Scheduled',
+      paymentStatus: 'Paid',
+      totalAmount: 20,
+      discountAmount: 0,
+      taxAmount: 6.3,
+      netAmount: 61.3,
+      notes: 'Slot: 9 AM - 10 AM',
+      customer: { id: 10, firstName: 'Rupesh', email: 'rupesh@example.com' },
+      orderItems: [{ clothType: 'T-Shirt', quantity: 2, unitPrice: 10, totalPrice: 20 }],
+      payments: [{ amount: 61.3, paymentMode: 'UPI', paymentStatus: 'Completed' }],
+    });
+
+    prismaMock.laundryShop.findUnique.mockResolvedValue({
+      id: 3,
+      shopName: 'Ashok laundry',
+      isActive: true,
+    });
+
+    prismaMock.order.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id: 560,
+        orderNumber: 'ORD-00560',
+        laundryShopId: data.laundryShopId,
+        orderStatus: data.orderStatus,
+        laundryShop: { id: 3, shopName: 'Ashok laundry' },
+      }),
+    );
+
+    const updated = await orderService.assignToShop(560, { laundryShopId: 3 });
+
+    expect(updated.orderStatus).toBe('Laundry');
+    expect(updated.laundryShopId).toBe(3);
+    expect(prismaMock.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 560 },
+        data: { laundryShopId: 3, orderStatus: 'Laundry' },
+      }),
+    );
+    expect(prismaMock.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: { orderId: 560, status: 'Laundry' },
+    });
+  });
+
+  it('Task 2: bulkAssignToShop should automatically change orderStatus to Laundry for all selected orders', async () => {
+    prismaMock.laundryShop.findUnique.mockResolvedValue({
+      id: 3,
+      shopName: 'Ashok laundry',
+      isActive: true,
+    });
+    prismaMock.order.findMany.mockResolvedValue([
+      { id: 559, orderNumber: 'ORD-00559', customerId: 11 },
+      { id: 560, orderNumber: 'ORD-00560', customerId: 10 },
+    ]);
+
+    const res = await orderService.bulkAssignToShop({
+      orderIds: [559, 560],
+      laundryShopId: 3,
+    });
+
+    expect(res.orderStatus).toBe('Laundry');
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [559, 560] } },
+      data: {
+        laundryShopId: 3,
+        orderStatus: 'Laundry',
+      },
+    });
+    expect(prismaMock.orderStatusHistory.createMany).toHaveBeenCalledWith({
+      data: [
+        { orderId: 559, status: 'Laundry' },
+        { orderId: 560, status: 'Laundry' },
+      ],
+    });
+  });
+
+  it('Task 1: verifyAndUpdateOrderItems should allow delivery boy to replace Suit with Pant + Shirt and recalculate bill', async () => {
+    orderRepoMock.findDetailed.mockResolvedValue({
+      id: 561,
+      orderNumber: 'ORD-00561',
+      customerId: 1,
+      pincode: '400078',
+      orderStatus: 'Pickup Scheduled',
+      paymentStatus: 'Pending',
+      totalAmount: 175,
+      discountAmount: 0,
+      taxAmount: 6.3,
+      netAmount: 216.3,
+      notes: 'Slot: 9 AM - 10 AM',
+      customer: { id: 1, firstName: 'Customer', pincode: '400078' },
+      orderItems: [{ id: 1, serviceId: 2, clothType: 'Suit', quantity: 1, unitPrice: 175, totalPrice: 175 }],
+      payments: [],
+    });
+
+    serviceRepoMock.findById.mockResolvedValue({
+      id: 2,
+      serviceName: 'Press / Ironing',
+      serviceType: 'Ironing',
+      price: 15,
+      isActive: true,
+    });
+
+    // Price lookup: Shirt = ₹15, Pant = ₹20
+    prismaMock.product.findFirst.mockImplementation(({ where }: any) => {
+      const name = where?.name?.equals;
+      if (name === 'Shirt') return Promise.resolve({ id: 101, name: 'Shirt', isActive: true });
+      if (name === 'Pant') return Promise.resolve({ id: 102, name: 'Pant', isActive: true });
+      return Promise.resolve(null);
+    });
+    prismaMock.servicePrice.findFirst.mockImplementation(({ where }: any) => {
+      if (where.productId === 101) return Promise.resolve({ price: 15 });
+      if (where.productId === 102) return Promise.resolve({ price: 20 });
+      return Promise.resolve(null);
+    });
+
+    prismaMock.order.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id: 561,
+        orderNumber: 'ORD-00561',
+        customerId: 1,
+        orderStatus: 'Pickup Scheduled',
+        paymentStatus: 'Pending',
+        totalAmount: data.totalAmount,
+        discountAmount: data.discountAmount,
+        taxAmount: data.taxAmount,
+        netAmount: data.netAmount,
+        notes: data.notes,
+        orderItems: data.orderItems.create,
+        payments: [],
+      }),
+    );
+
+    const verified = await orderService.verifyAndUpdateOrderItems(561, {
+      orderItems: [
+        { serviceId: 2, clothType: 'Shirt', quantity: 2 },
+        { serviceId: 2, clothType: 'Pant', quantity: 1 },
+      ],
+      verificationNotes: 'Customer gave 2 Shirts and 1 Pant instead of Suit',
+    });
+
+    // 2 Shirts (₹30) + 1 Pant (₹20) = ₹50 subtotal
+    // Platform fee = ₹5, Delivery = ₹30 (< 10 clothes, <= ₹300), GST = ₹6.30 -> Net = ₹91.30
+    expect(verified.totalAmount).toBe(50);
+    expect(verified.netAmount).toBe(91.3);
+    expect(verified.orderItems).toHaveLength(2);
+    expect(verified.notes).toContain('Clothes Verified: 3 pcs');
+    expect(prismaMock.orderItem.deleteMany).toHaveBeenCalledWith({ where: { orderId: 561 } });
+  });
+});

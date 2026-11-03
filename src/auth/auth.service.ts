@@ -234,26 +234,67 @@ export class AuthService {
   }
 
   async registerEmployee(dto: RegisterEmployeeDto) {
-    const emailExists = await this.prisma.employee.findUnique({ where: { email: dto.email } });
+    const emailTrimmed = (dto.email || '').trim();
+    const mobileTrimmed = (dto.mobileNumber || '').trim();
+    const fullNameTrimmed = (dto.fullName || '').trim();
+
+    if (!emailTrimmed) {
+      throw new BadRequestException('Email address is required');
+    }
+    if (!mobileTrimmed) {
+      throw new BadRequestException('Mobile number is required');
+    }
+
+    const emailExists = await this.prisma.employee.findUnique({ where: { email: emailTrimmed } });
     if (emailExists) throw new BadRequestException('Email already registered');
 
-    const mobileExists = await this.prisma.employee.findUnique({ where: { mobileNumber: dto.mobileNumber } });
+    const mobileExists = await this.prisma.employee.findUnique({ where: { mobileNumber: mobileTrimmed } });
     if (mobileExists) throw new BadRequestException('Mobile number already registered');
 
-    // Generate EmployeeCode
+    // Sync PostgreSQL sequence for employees.id to prevent P2002 on id
+    try {
+      if ((this.prisma as any).$executeRawUnsafe) {
+        await this.prisma.$executeRawUnsafe(
+          `SELECT setval(pg_get_serial_sequence('employees', 'id'), COALESCE((SELECT MAX(id) FROM employees), 0) + 1, false);`,
+        );
+      }
+    } catch (seqErr) {
+      console.warn('[AUTH] Sequence sync warning for employees:', seqErr);
+    }
+
+    // Generate collision-free EmployeeCode (handles gaps/deletions such as existing EMP-0006 when count is 5)
     const count = await this.prisma.employee.count();
-    const employeeCode = `EMP-${String(count + 1).padStart(4, '0')}`;
+    let nextNum = count + 1;
+    let employeeCode = `EMP-${String(nextNum).padStart(4, '0')}`;
+    while (await this.prisma.employee.findUnique({ where: { employeeCode } })) {
+      nextNum++;
+      employeeCode = `EMP-${String(nextNum).padStart(4, '0')}`;
+    }
+
+    // Validate optional branchId to avoid foreign key errors
+    let resolvedBranchId: number | undefined = undefined;
+    if (dto.branchId !== undefined && dto.branchId !== null && Number(dto.branchId) > 0) {
+      const numericBranchId = Number(dto.branchId);
+      if ((this.prisma as any).branch?.findUnique) {
+        const branchExists = await this.prisma.branch.findUnique({ where: { id: numericBranchId } });
+        if (branchExists) {
+          resolvedBranchId = branchExists.id;
+        }
+      } else {
+        resolvedBranchId = numericBranchId;
+      }
+    }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     const employee = await this.prisma.employee.create({
       data: {
         employeeCode,
-        fullName: dto.fullName,
-        email: dto.email,
-        mobileNumber: dto.mobileNumber,
-        role: dto.role,
-        branchId: dto.branchId,
+        fullName: fullNameTrimmed || dto.fullName,
+        email: emailTrimmed,
+        mobileNumber: mobileTrimmed,
+        role: dto.role || 'Employee',
+        branchId: resolvedBranchId,
         password: hashedPassword,
         isActive: true,
       },

@@ -170,7 +170,7 @@ export class DeliveryService {
 
   async findAll() {
     return this.deliveryRepository.findAll({
-      include: { order: { include: { customer: true } }, deliveryEmployee: true },
+      include: { order: { include: { customer: true, laundryShop: true, orderItems: { include: { service: true } } } }, deliveryEmployee: true },
       orderBy: { id: 'desc' },
     });
   }
@@ -357,7 +357,7 @@ export class DeliveryService {
   async findByEmployee(employeeId: number) {
     return this.deliveryRepository.findAll({
       where: { deliveryEmployeeId: employeeId },
-      include: { order: { include: { customer: true, laundryShop: true } } },
+      include: { order: { include: { customer: true, laundryShop: true, orderItems: { include: { service: true } } } } },
       orderBy: { id: 'desc' },
     });
   }

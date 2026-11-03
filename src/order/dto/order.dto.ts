@@ -212,3 +212,16 @@ export class UpdateTimeSlotDto {
   @IsOptional()
   isActive?: boolean;
 }
+
+export class VerifyOrderItemsDto {
+  @ApiProperty({ type: [CreateOrderItemDto], description: 'Verified and updated order items' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  orderItems!: CreateOrderItemDto[];
+
+  @ApiProperty({ example: 'Verified clothes at customer doorstep', required: false })
+  @IsString()
+  @IsOptional()
+  verificationNotes?: string;
+}

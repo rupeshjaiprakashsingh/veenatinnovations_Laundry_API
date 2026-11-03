@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateNotificationDto {
@@ -12,8 +12,23 @@ export class CreateNotificationDto {
   @IsNotEmpty()
   message!: string;
 
-  @ApiProperty({ example: 'Push', description: 'Email, SMS, Push' })
+  @ApiProperty({ example: 'Push', description: 'Email, SMS, Push, AdminMessage', required: false })
   @IsString()
-  @IsNotEmpty()
-  notificationType!: string;
+  @IsOptional()
+  notificationType?: string;
+
+  @ApiProperty({ example: 560, required: false })
+  @IsNumber()
+  @IsOptional()
+  orderId?: number;
+
+  @ApiProperty({ example: 'ORD-00560', required: false })
+  @IsString()
+  @IsOptional()
+  orderNumber?: string;
+
+  @ApiProperty({ example: 'Important Update on Your Order', required: false })
+  @IsString()
+  @IsOptional()
+  title?: string;
 }

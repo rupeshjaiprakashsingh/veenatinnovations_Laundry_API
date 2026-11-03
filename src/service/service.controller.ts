@@ -27,7 +27,7 @@ export class ServiceController {
   @Get('admin/products')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Get list of all products (Admin only)' })
   findAllProducts() {
     return this.serviceService.findAllProducts();
@@ -64,7 +64,7 @@ export class ServiceController {
   @Get('admin/prices')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SuperAdmin')
+  @Roles('SuperAdmin', 'BranchManager', 'Employee', 'DeliveryBoy')
   @ApiOperation({ summary: 'Get list of all service prices (Admin only)' })
   findAllServicePrices() {
     return this.serviceService.findAllServicePrices();

@@ -30,8 +30,24 @@ async function bootstrap() {
   const adminDist = join(process.cwd(), 'public', 'admin');
   const adminIndexHtml = join(adminDist, 'index.html');
 
+  const setNoCacheHeaders = (res: express.Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  };
+
   if (fs.existsSync(adminDist)) {
-    app.use('/admin', express.static(adminDist));
+    app.use(
+      '/admin',
+      express.static(adminDist, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            setNoCacheHeaders(res);
+          }
+        },
+      }),
+    );
   }
 
   const publicDir = join(process.cwd(), 'public');
@@ -40,8 +56,9 @@ async function bootstrap() {
   }
 
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (req.path.startsWith('/admin') && !req.path.startsWith('/api')) {
+    if (req.path.startsWith('/admin') && !req.path.startsWith('/api') && !req.path.startsWith('/admin/assets/')) {
       if (fs.existsSync(adminIndexHtml)) {
+        setNoCacheHeaders(res);
         return res.sendFile(adminIndexHtml);
       }
     }

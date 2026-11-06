@@ -192,12 +192,13 @@ export class PickupService {
         }
 
         if (!activeOrder) {
-          // Find the active order for this customer in pickup phase (New Order or Pickup Scheduled)
+          // Find the active order for this customer in pickup phase (including when pre-assigned to Laundry)
           activeOrder = await tx.order.findFirst({
             where: {
               customerId: pickup.customerId,
-              orderStatus: { in: ['New Order', 'Pickup Scheduled'] },
+              orderStatus: { in: ['New Order', 'Pickup Scheduled', 'Laundry'] },
             },
+            include: { customer: true, laundryShop: true },
             orderBy: { id: 'desc' },
           });
         }
@@ -368,7 +369,18 @@ export class PickupService {
               activeOrder = await this.prisma.order.findFirst({
                 where: {
                   customerId: pickup.customerId,
-                  orderStatus: { in: ['Picked Up', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
+                  orderStatus: { in: ['Picked Up', 'Laundry', 'Processing', 'Washing', 'Dry Cleaning', 'Ironing', 'Ready For Delivery'] },
+                },
+                include: { laundryShop: true, orderItems: { include: { service: true } } },
+                orderBy: { id: 'desc' },
+              });
+            }
+
+            if (!activeOrder) {
+              activeOrder = await this.prisma.order.findFirst({
+                where: {
+                  customerId: pickup.customerId,
+                  orderStatus: { not: 'Cancelled' },
                 },
                 include: { laundryShop: true, orderItems: { include: { service: true } } },
                 orderBy: { id: 'desc' },
